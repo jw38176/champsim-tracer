@@ -16,8 +16,6 @@ namespace bop_space
 class BOP
 {
 private:
-  enum RRWay { Left, Right };
-
   /** Learning phase parameters */
   const unsigned int scoreMax;
   const unsigned int roundMax;
@@ -25,38 +23,12 @@ private:
   /** Recent requests table parameteres */
   const unsigned int rrEntries;
   const unsigned int tagMask;
-  /** Delay queue parameters */
-  // const bool         delayQueueEnabled;
-  // const unsigned int delayQueueSize;
-  // const unsigned int delayTicks;
 
-  std::vector<uint64_t> rrLeft;
-  std::vector<uint64_t> rrRight;
+  std::vector<uint64_t> rrTable;
 
   /** Structure to save the offset and the score */
   typedef std::pair<int16_t, uint8_t> OffsetListEntry;
   std::vector<OffsetListEntry> offsetsList;
-
-  /** In a first implementation of the BO prefetcher, both banks of the
-   *  RR were written simultaneously when a prefetched line is inserted
-   *  into the cache. Adding the delay queue tries to avoid always
-   *  striving for timeless prefetches, which has been found to not
-   *  always being optimal.
-   */
-  // struct DelayQueueEntry
-  // {
-  //     uint64_t baseAddr;
-  //     uint64_t processTick;
-
-  //     DelayQueueEntry(uint64_t x, uint64_t t) : baseAddr(x), processTick(t)
-  //     {}
-  // };
-
-  // std::deque<DelayQueueEntry> delayQueue;
-
-  /** Event to handle the delay queue processing */
-  // void delayQueueEventWrapper();
-  // EventFunctionWrapper delayQueueEvent;
 
   /** Current best offset to issue prefetches */
   uint64_t bestOffset;
@@ -71,22 +43,14 @@ private:
 
   /** Generate a hash for the specified address to index the RR table
    *  @param addr: address to hash
-   *  @param way:  RR table to which is addressed (left/right)
    */
-  unsigned int index(uint64_t addr, unsigned int way) const;
+  unsigned int index(uint64_t addr) const;
 
   /** Insert the specified address into the RR table
    *  @param addr: address to insert
    *  @param addr_tag: The tag to insert in the RR table
-   *  @param way: RR table to which the address will be inserted
    */
-  void insertIntoRR(uint64_t addr, uint64_t addr_tag, unsigned int way);
-
-  /** Insert the specified address into the delay queue. This will
-   *  trigger an event after the delay cycles pass
-   *  @param addr: address to insert into the delay queue
-   */
-  void insertIntoDelayQueue(uint64_t addr);
+  void insertIntoRR(uint64_t addr, uint64_t addr_tag);
 
   /** Reset all the scores from the offset list */
   void resetScores();
@@ -102,9 +66,6 @@ private:
    *  @param addr_tag: tag searched for within the RR
    */
   bool testRR(uint64_t addr_tag) const;
-
-  /** Update the RR right table after a prefetch fill */
-  // void notifyFill(const CacheAccessProbeArg &arg) override;
 
 public:
   /** The prefetch degree, i.e. the number of prefetches to generate */

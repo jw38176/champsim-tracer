@@ -6,10 +6,6 @@ using namespace bop_space;
 
 BOP::BOP()
     : scoreMax(SCORE_MAX), roundMax(ROUND_MAX), badScore(BAD_SCORE), rrEntries(RR_SIZE), tagMask((1 << TAG_BITS) - 1),
-      // delayQueueEnabled(DELAY_QUEUE_ENABLE),
-      // delayQueueSize(DELAY_QUEUE_SIZE),
-      // delayTicks(cyclesToTicks(p.delay_queue_cycles)),
-      // delayQueueEvent([this]{ delayQueueEventWrapper(); }, name()),
       issuePrefetchRequests(true), bestOffset(1), phaseBestOffset(0), bestScore(0), round(0), degree(1)
 {
   if (!champsim::msl::isPowerOf2(rrEntries)) {
@@ -22,8 +18,7 @@ BOP::BOP()
     throw std::invalid_argument{"Negative offsets enabled with odd offset list size\n"};
   }
 
-  rrLeft.resize(rrEntries);
-  rrRight.resize(rrEntries);
+  rrTable.resize(rrEntries);
 
   /*
    * Following the paper implementation, a list with the specified number
@@ -61,89 +56,24 @@ BOP::BOP()
   offsetsListIterator = offsetsList.begin();
 }
 
-// void
-// BOP::delayQueueEventWrapper()
-// {
-//     while (!delayQueue.empty() &&
-//             delayQueue.front().processTick <= curTick())
-//     {
-//         Addr addr_x = delayQueue.front().baseAddr;
-//         Addr addr_tag = tag(addr_x);
-//         insertIntoRR(addr_x, addr_tag, RRWay::Left);
-//         delayQueue.pop_front();
-//     }
-
-//     // Schedule an event for the next element if there is one
-//     if (!delayQueue.empty()) {
-//         schedule(delayQueueEvent, delayQueue.front().processTick);
-//     }
-// }
-
-unsigned int BOP::index(uint64_t addr, unsigned int way) const
+unsigned int BOP::index(uint64_t addr) const
 {
   /*
-   * The second parameter, way, is set to 0 for indexing the left side of the
-   * RR Table and, it is set to 1 for indexing the right side of the RR
-   * Table. This is because we always pass the enum RRWay as the way argument
-   * while calling index. This enum is defined in the bop.hh file.
-   *
-   * The indexing function in the author's ChampSim code, which can be found
-   * here: https://comparch-conf.gatech.edu/dpc2/final_program.html, computes
-   * the hash as follows:
-   *
-   *  1. For indexing the left side of the RR Table (way = 0), the cache line
-   *     address is XORed with itself after right shifting it by the log base
-   *     2 of the number of entries in the RR Table.
-   *  2. For indexing the right side of the RR Table (way = 1), the cache
-   *     line address is XORed with itself after right shifting it by the log
-   *     base 2 of the number of entries in the RR Table, multiplied by two.
-   *
-   * Therefore, we if just left shift the log base 2 of the number of RR
-   * entries (log_rr_entries) with the parameter way, then if we are indexing
-   * the left side, we'll leave log_rr_entries as it is, but if we are
-   * indexing the right side, we'll multiply it with 2. Now once we have the
-   * result of this operation, we can right shift the cache line address
-   * (line_addr) by this value to get the first operand of the final XOR
-   * operation. The second operand of the XOR operation is line_addr itself
+   * For indexing the RR Table, the cache line
+   * address is XORed with itself after right shifting it by the log base
+   * 2 of the number of entries in the RR Table.
    */
   uint64_t log_rr_entries = champsim::lg2(rrEntries);
   uint64_t line_addr = addr >> LOG2_BLOCK_SIZE;
-  uint64_t hash = line_addr ^ (line_addr >> (log_rr_entries << way));
+  uint64_t hash = line_addr ^ (line_addr >> log_rr_entries);
   hash &= ((1ULL << log_rr_entries) - 1);
   return hash % rrEntries;
 }
 
-void BOP::insertIntoRR(uint64_t addr, uint64_t tag, unsigned int way)
+void BOP::insertIntoRR(uint64_t addr, uint64_t tag)
 {
-  switch (way) {
-  case RRWay::Left:
-    rrLeft[index(addr, RRWay::Left)] = tag;
-    break;
-  case RRWay::Right:
-    rrRight[index(addr, RRWay::Right)] = tag;
-    break;
-  }
+  rrTable[index(addr)] = tag;
 }
-
-// void
-// BOP::insertIntoDelayQueue(uint64_t x)
-// {
-//     if (delayQueue.size() == delayQueueSize) {
-//         return;
-//     }
-
-//     /*
-//     * Add the address to the delay queue and schedule an event to process
-//     * it after the specified delay cycles
-//     */
-//     Tick process_tick = curTick() + delayTicks;
-
-//     delayQueue.push_back(DelayQueueEntry(x, process_tick));
-
-//     if (!delayQueueEvent.scheduled()) {
-//         schedule(delayQueueEvent, process_tick);
-//     }
-// }
 
 void BOP::resetScores()
 {
@@ -156,13 +86,7 @@ inline uint64_t BOP::tag(uint64_t addr) const { return (addr >> LOG2_BLOCK_SIZE)
 
 bool BOP::testRR(uint64_t addr_tag) const
 {
-  for (auto& it : rrLeft) {
-    if (it == addr_tag) {
-      return true;
-    }
-  }
-
-  for (auto& it : rrRight) {
+  for (auto& it : rrTable) {
     if (it == addr_tag) {
       return true;
     }
@@ -173,14 +97,14 @@ bool BOP::testRR(uint64_t addr_tag) const
 
 void BOP::bestOffsetLearning(uint64_t addr)
 {
-  uint64_t offset_tag = (*offsetsListIterator).first;
+  uint64_t offset = (*offsetsListIterator).first;
 
   /*
    * Compute the lookup tag for the RR table. As tags are generated using
    * lower 12 bits we subtract offset from the full address rather than the
    * tag to avoid integer underflow.
    */
-  uint64_t lookup_tag = tag((addr) - (offset_tag << LOG2_BLOCK_SIZE));
+  uint64_t lookup_tag = tag((addr) - (offset << LOG2_BLOCK_SIZE));
 
   // There was a hit in the RR table, increment the score for this offset
   if (testRR(lookup_tag)) {
@@ -244,10 +168,10 @@ uint64_t BOP::calculatePrefetchAddr(uint64_t addr)
 
 void BOP::insertFill(uint64_t addr)
 {
-  uint64_t tag_y = tag(addr);
-
+  uint64_t tag_y = tag((addr) - (bestOffset << LOG2_BLOCK_SIZE));
+  
   if (issuePrefetchRequests) {
-    insertIntoRR(addr, tag_y - bestOffset, RRWay::Right);
+    insertIntoRR(addr, tag_y);
     std::cout << "Filled RR" << std::endl;
   }
 }
@@ -274,12 +198,6 @@ uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cac
    */
     bop->bestOffsetLearning(addr);
 
-  // if (delayQueueEnabled) {
-  //   insertIntoDelayQueue(addr);
-  // } else {
-  //   insertIntoRR(addr, tag_x, RRWay::Left);
-  // }
-
     if (bop->issuePrefetchRequests) {
       uint64_t pf_addr = bop->calculatePrefetchAddr(addr);
       prefetch_line(pf_addr, true, metadata_in);
@@ -298,7 +216,7 @@ uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cac
 // set and way of allocated entry
 uint32_t CACHE::prefetcher_cache_fill(uint64_t addr, uint32_t set, uint32_t way, uint8_t prefetch, uint64_t evicted_addr, uint32_t metadata_in)
 {
-  // Only insert into the RR right way if fill is a hardware prefetch
+  // Only insert into the RR Table if fill is a hardware prefetch
   if (prefetch){
     bop->insertFill(addr);
   }
