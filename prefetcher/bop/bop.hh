@@ -87,7 +87,6 @@ public:
 
   BOP();
   ~BOP() = default;
-
 }; // class bop
 
 BOP* bop;
