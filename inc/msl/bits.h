@@ -30,6 +30,15 @@ constexpr uint64_t bitmask(std::size_t begin, std::size_t end = 0)
 }
 
 constexpr uint64_t splice_bits(uint64_t upper, uint64_t lower, std::size_t bits) { return (upper & ~bitmask(bits)) | (lower & bitmask(bits)); }
+
+template <class T>
+static constexpr bool
+isPowerOf2(const T& n)
+{
+    // If n is non-zero, and subtracting one borrows all the way to the MSB
+    // and flips all bits, then this is a power of 2.
+    return n && !(n & (n - 1));
+}
 } // namespace champsim::msl
 
 #endif

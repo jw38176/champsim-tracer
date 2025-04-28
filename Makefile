@@ -1,6 +1,7 @@
 ROOT_DIR = $(patsubst %/,%,$(dir $(abspath $(firstword $(MAKEFILE_LIST)))))
 
-CPPFLAGS += -MMD -I$(ROOT_DIR)/inc
+# CPPFLAGS += -MMD -I$(ROOT_DIR)/inc
+CPPFLAGS += -MMD -I$(ROOT_DIR)/inc -DBOP_DEBUG
 CXXFLAGS += --std=c++17 -O3 -Wall -Wextra -Wshadow -Wpedantic
 
 # vcpkg integration
