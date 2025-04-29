@@ -172,7 +172,10 @@ void BOP::insertFill(uint64_t addr)
   
   if (issuePrefetchRequests) {
     insertIntoRR(addr, tag_y);
-    std::cout << "Filled RR" << std::endl;
+    if constexpr (champsim::bop_debug) 
+    {
+      std::cout << "Filled RR" << bestOffset << std::endl;
+    }
   }
 }
 

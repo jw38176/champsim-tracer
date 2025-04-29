@@ -6,7 +6,7 @@ using namespace kairos_space;
 
 KAIROS::KAIROS()
     : scoreMax(SCORE_MAX), roundMax(ROUND_MAX), badScore(BAD_SCORE), rrEntries(RR_SIZE), tagMask((1 << TAG_BITS) - 1),
-      issuePrefetchRequests(true), bestOffset(1), phaseBestOffset(0), bestScore(0), round(0), degree(1)
+      issuePrefetchRequests(true), prefetch_table(PREFETCH_TABLE_SETS, PREFETCH_TABLE_WAYS), bestOffset(1), phaseBestOffset(0), bestScore(0), round(0), degree(1)
 {
   if (!champsim::msl::isPowerOf2(rrEntries)) {
     throw std::invalid_argument{"Number of RR entries is not power of 2\n"};
@@ -104,7 +104,7 @@ void KAIROS::bestOffsetLearning(uint64_t addr)
    * lower 12 bits we subtract offset from the full address rather than the
    * tag to avoid integer underflow.
    */
-  uint64_t lookup_tag = tag((addr) - (offset << LOG2_BLOCK_SIZE));
+  uint64_t lookup_tag = tag(addr - (offset << LOG2_BLOCK_SIZE));
 
   // There was a hit in the RR table, increment the score for this offset
   if (testRR(lookup_tag)) {
@@ -163,16 +163,40 @@ void KAIROS::bestOffsetLearning(uint64_t addr)
 
 uint64_t KAIROS::calculatePrefetchAddr(uint64_t addr)
 {
-  return addr + (bestOffset << LOG2_BLOCK_SIZE);
+  uint64_t pf_addr = addr + (bestOffset << LOG2_BLOCK_SIZE);
+
+  // Append the pf_addr with the offset used to calculate it
+  PrefetchTableEntry entry{pf_addr, bestOffset};
+  if constexpr (champsim::kairos_dbug) 
+  {
+    std::cout << "Inserted addr into prefetch table" << std::endl;
+  }
+  prefetch_table.fill(entry); 
+  return pf_addr;
 }
 
 void KAIROS::insertFill(uint64_t addr)
 {
-  uint64_t tag_y = tag((addr) - (bestOffset << LOG2_BLOCK_SIZE));
-  
-  if (issuePrefetchRequests) {
-    insertIntoRR(addr, tag_y);
-    std::cout << "Filled RR" << std::endl;
+  auto result = prefetch_table.check_hit(PrefetchTableEntry{addr, 0});
+  if (result.has_value()) {
+    u_int64_t matched_offset = result->offset;
+    prefetch_table.invalidate(PrefetchTableEntry{addr, matched_offset}); 
+
+    uint64_t tag_y = tag(addr - (matched_offset << LOG2_BLOCK_SIZE));
+
+    if (issuePrefetchRequests) {
+      insertIntoRR(addr, tag_y);
+      if constexpr (champsim::kairos_dbug) 
+      {
+        std::cout << "Filled RR" << std::endl;
+      }
+    }
+  }
+  else {
+    if constexpr (champsim::kairos_dbug) 
+    {
+      std::cout << "Filled addr not found in recent prefetches" << std::endl;
+    }
   }
 }
 

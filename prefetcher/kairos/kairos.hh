@@ -10,6 +10,7 @@
 #include "kairos_parameters.h"
 #include "cache.h"
 #include "msl/bits.h"
+#include "msl/lru_table.h"
 
 namespace kairos_space
 { 
@@ -25,6 +26,16 @@ private:
   const unsigned int tagMask;
 
   std::vector<uint64_t> rrTable;
+
+  struct PrefetchTableEntry {
+    uint64_t addr;
+    uint64_t offset;
+
+    uint64_t index() const { return addr; }  // Set index
+    uint64_t tag() const { return addr; }  // Tag 
+  };
+
+  champsim::msl::lru_table<PrefetchTableEntry> prefetch_table;
 
   /** Structure to save the offset and the score */
   typedef std::pair<int16_t, uint8_t> OffsetListEntry;
