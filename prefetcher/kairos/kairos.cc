@@ -4,9 +4,39 @@
 
 using namespace kairos_space;
 
+
+PrefetchTable::PrefetchTable(std::size_t table_max_size)
+  : max_size(table_max_size) {}
+
+void PrefetchTable::insert(const Entry& entry) {
+  if (table.size() >= max_size) {
+    table.pop_front();  // Remove oldest
+  }
+  table.push_back(entry);  // Insert newest
+}
+
+std::optional<PrefetchTable::Entry> PrefetchTable::lookup(uint64_t addr) const {
+  for (const auto& entry : table) {
+    if (entry.addr == addr) {
+      return entry;
+    }
+  }
+  return std::nullopt;
+}
+
+void PrefetchTable::remove(uint64_t addr) {
+  auto it = std::find_if(table.begin(), table.end(),
+                         [addr](const Entry& entry) {
+                           return entry.addr == addr;
+                         });
+  if (it != table.end()) {
+    table.erase(it);
+  }
+}
+
 KAIROS::KAIROS()
     : scoreMax(SCORE_MAX), roundMax(ROUND_MAX), badScore(BAD_SCORE), rrEntries(RR_SIZE), tagMask((1 << TAG_BITS) - 1),
-      issuePrefetchRequests(true), prefetch_table(PREFETCH_TABLE_SETS, PREFETCH_TABLE_WAYS), bestOffset(1), phaseBestOffset(0), bestScore(0), round(0), degree(1)
+      issuePrefetchRequests(true), prefetch_table(PREFETCH_TABLE_SIZE), phaseBestOffset(0), bestScore(0), round(0)
 {
   if (!champsim::msl::isPowerOf2(rrEntries)) {
     throw std::invalid_argument{"Number of RR entries is not power of 2\n"};
@@ -54,6 +84,12 @@ KAIROS::KAIROS()
   }
 
   offsetsListIterator = offsetsList.begin();
+  if constexpr (champsim::kairos_dbug) {
+    std::cout << "Offsets List:\n";
+    for (const auto& entry : offsetsList) {
+        std::cout << "Offset: " << entry.first << ", Metadata: " << static_cast<int>(entry.second) << '\n';
+    }
+  }
 }
 
 unsigned int KAIROS::index(uint64_t addr) const
@@ -62,7 +98,7 @@ unsigned int KAIROS::index(uint64_t addr) const
    * For indexing the RR Table, the cache line
    * address is XORed with itself after right shifting it by the log base
    * 2 of the number of entries in the RR Table.
-   */
+  */
   uint64_t log_rr_entries = champsim::lg2(rrEntries);
   uint64_t line_addr = addr >> LOG2_BLOCK_SIZE;
   uint64_t hash = line_addr ^ (line_addr >> log_rr_entries);
@@ -97,92 +133,120 @@ bool KAIROS::testRR(uint64_t addr_tag) const
 
 void KAIROS::bestOffsetLearning(uint64_t addr)
 {
+  /*
+   * This can be changed to store offset in cache/shadowcache and checking this way
+  */
+
+
+  // Skip learning if any of the already-learned offsets covered this addr
+  for (std::size_t i = 0; i < learned_offsets.size(); ++i) {
+    if (i == current_learning_offset_idx) continue; // skip the offset we're learning
+    uint64_t off = learned_offsets[i];
+    if (off == 0) continue; // unused slot
+    uint64_t prev_pf_addr = addr - (off << LOG2_BLOCK_SIZE);
+    if (testRR(tag(prev_pf_addr))) {
+        return; // Already covered by another learned offset
+    }
+  }
+
   uint64_t offset = (*offsetsListIterator).first;
 
-  /*
-   * Compute the lookup tag for the RR table. As tags are generated using
-   * lower 12 bits we subtract offset from the full address rather than the
-   * tag to avoid integer underflow.
-   */
+  // Subtract offset from full addr to avoid underflow before tagging
   uint64_t lookup_tag = tag(addr - (offset << LOG2_BLOCK_SIZE));
 
-  // There was a hit in the RR table, increment the score for this offset
+  // Score offset if demand addr was prefetched
   if (testRR(lookup_tag)) {
-    if constexpr (champsim::kairos_dbug) 
-    {
-      std::cout << "Address " << lookup_tag << " found in the RR table" << std::endl;
+    if constexpr (champsim::kairos_dbug) {
+      std::cout << "Address " << lookup_tag << " found in RR table" << std::endl;
     }
     (*offsetsListIterator).second++;
+
     if ((*offsetsListIterator).second > bestScore) {
       bestScore = (*offsetsListIterator).second;
-      phaseBestOffset = (*offsetsListIterator).first;
-      if constexpr (champsim::kairos_dbug) 
-      {
-        std::cout << "New best score is " << bestScore << std::endl;
+      phaseBestOffset = offset;
+      if constexpr (champsim::kairos_dbug) {
+        std::cout << "New best score is " << bestScore << " for offset " << offset << std::endl;
       }
     }
   }
 
-  // Move the offset iterator forward to prepare for the next time
-  offsetsListIterator++;
-
-  /*
-   * All the offsets in the list were visited meaning that a learning
-   * phase finished. Check if
-   */
+  // Advance learning offset candidate
+  ++offsetsListIterator;
   if (offsetsListIterator == offsetsList.end()) {
     offsetsListIterator = offsetsList.begin();
     round++;
   }
 
-  // Check if its time to re-calculate the best offset
+  // Learning phase end
   if ((bestScore >= scoreMax) || (round >= roundMax)) {
-    round = 0;
-
-    /*
-     * If the current best score (bestScore) has exceed the threshold to
-     * enable prefetching (badScore), reset the learning structures and
-     * enable prefetch generation
-     */
-    if (bestScore > badScore) {
-      bestOffset = phaseBestOffset;
-      if constexpr (champsim::kairos_dbug) 
-      {
-        std::cout << "New best offset is " << bestOffset << std::endl;
-      }
-      round = 0;
-      issuePrefetchRequests = true;
-    } else {
-      issuePrefetchRequests = false;
+    learned_offsets[current_learning_offset_idx] = phaseBestOffset;
+    if constexpr (champsim::kairos_dbug) {
+      std::cout << "Learned new offset #" << current_learning_offset_idx << ": " << phaseBestOffset << std::endl;
     }
-    resetScores();
+
+    // Move to next learning slot (wrap 0–3)
+    current_learning_offset_idx = (current_learning_offset_idx + 1) % learned_offsets.size();
+
+    // Reset learning phase
+    round = 0;
     bestScore = 0;
     phaseBestOffset = 0;
+    resetScores();
   }
 }
 
-uint64_t KAIROS::calculatePrefetchAddr(uint64_t addr)
+std::vector<uint64_t> KAIROS::calculatePrefetchAddrs(uint64_t addr)
 {
-  uint64_t pf_addr = addr + (bestOffset << LOG2_BLOCK_SIZE);
+  std::vector<uint64_t> pf_addrs;
 
-  // Append the pf_addr with the offset used to calculate it
-  PrefetchTableEntry entry{pf_addr, bestOffset};
-  if constexpr (champsim::kairos_dbug) 
-  {
-    std::cout << "Inserted addr into prefetch table" << std::endl;
+  for (auto offset : learned_offsets) {
+    if (offset == 0) continue; // Skip unused slots
+
+    uint64_t pf_addr = addr + (offset << LOG2_BLOCK_SIZE);
+
+    // prefetch_table.remove(PrefetchTableEntry{addr, matched_offset}); 
+
+    if ((addr >> LOG2_PAGE_SIZE) != (pf_addr >> LOG2_PAGE_SIZE))
+    {
+      if constexpr (champsim::kairos_dbug) 
+      {
+        std::cout << "Prefetch not issued - Page crossed" << std::endl;
+      }
+      continue;
+    } 
+
+    PrefetchTable::Entry entry{pf_addr, offset};
+    prefetch_table.insert(entry);
+
+    pf_addrs.push_back(pf_addr);
+
+    if constexpr (champsim::kairos_dbug) {
+      std::cout << "Generated prefetch: " << pf_addr << " with offset " << offset << std::endl;
+    }
   }
-  prefetch_table.fill(entry); 
-  return pf_addr;
+
+  return pf_addrs;
 }
 
 void KAIROS::insertFill(uint64_t addr)
 {
-  auto result = prefetch_table.check_hit(PrefetchTableEntry{addr, 0});
+  auto result = prefetch_table.lookup(addr);
   if (result.has_value()) {
-    u_int64_t matched_offset = result->offset;
-    prefetch_table.invalidate(PrefetchTableEntry{addr, matched_offset}); 
+    uint64_t matched_offset = result->offset;
 
-    uint64_t tag_y = tag(addr - (matched_offset << LOG2_BLOCK_SIZE));
+    uint64_t base_address = addr - (matched_offset << LOG2_BLOCK_SIZE);
+    // prefetch_table.invalidate(PrefetchTableEntry{addr, matched_offset}); 
+
+    if ((base_address >> LOG2_PAGE_SIZE) != (addr >> LOG2_PAGE_SIZE))
+    {
+      if constexpr (champsim::kairos_dbug) 
+      {
+        std::cout << "Filled address crossed page" << std::endl;
+      }
+      return;
+    } 
+
+    uint64_t tag_y = tag(base_address);
 
     if (issuePrefetchRequests) {
       insertIntoRR(addr, tag_y);
@@ -212,22 +276,27 @@ void CACHE::prefetcher_initialize()
 uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cache_hit, bool useful_prefetch, uint8_t type, uint32_t metadata_in)
 {
   if (type != 0) {
-    return metadata_in; // access is not a load
+    return metadata_in; // Not a load
   }
 
   if ((cache_hit && useful_prefetch) || !cache_hit) {
-    /*
-    * Go through the nth offset and update the score, the best score and the
-    * current best offset if a better one is found
-   */
+    // increment useful prefetch counter, not quite the same as cache stat since we don't remove the prefetch tag, could change to increment sim stats here
+    // also missing mshr hit
+    if(cache_hit && useful_prefetch) { kairos->pf_useful_kairos++; }
     kairos->bestOffsetLearning(addr);
 
     if (kairos->issuePrefetchRequests) {
-      uint64_t pf_addr = kairos->calculatePrefetchAddr(addr);
-      prefetch_line(pf_addr, true, metadata_in);
-      if constexpr (champsim::kairos_dbug) 
-      {
-        std::cout << "Generated Prefetch " << pf_addr << std::endl;
+      auto pf_addrs = kairos->calculatePrefetchAddrs(addr);
+      
+      for (auto pf_addr : pf_addrs) {
+        std::vector<std::size_t> pq_occupancy = get_pq_occupancy();
+        // std::cout << "pq_occupany: " << pq_occupancy[2] << std::endl;
+        // Compare l2C pq size to check if pf will be issued
+        // if (pq_occupancy[2] < PQ_SIZE){ 
+        //   ++(kairos->pf_issued_kairos);
+        // }
+        bool issued = prefetch_line(pf_addr, true, metadata_in);
+        if (issued) {++(kairos->pf_issued_kairos);} else {std::cout << "pq_occupany: " << pq_occupancy[2] << "PQ FULL" << std::endl;}
       }
     }
   }
@@ -250,4 +319,7 @@ uint32_t CACHE::prefetcher_cache_fill(uint64_t addr, uint32_t set, uint32_t way,
 
 void CACHE::prefetcher_cycle_operate() {}
 
-void CACHE::prefetcher_final_stats() {}
+void CACHE::prefetcher_final_stats() {
+  std::cout << "KAIROS ISSUED: " << kairos->pf_issued_kairos << std::endl;
+  std::cout << "KAIROS USEFUL: " << kairos->pf_useful_kairos << std::endl;
+}

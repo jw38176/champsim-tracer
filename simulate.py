@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 from _SPEC2017_def import SPEC2017_SHORTCODE, SPEC2017_PATH
 
 # Define the warmup and instructions to run (in millions)
-WARMUP_INSTRUCTIONS = 1
+WARMUP_INSTRUCTIONS = 0
 SIMULATION_INSTRUCTIONS = 2
 
 # Parse arguments

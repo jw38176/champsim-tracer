@@ -6,6 +6,9 @@
 #include <queue>
 #include <stdlib.h>
 #include <vector>
+#include <deque>
+#include <optional>
+#include <cstdint>
 
 #include "kairos_parameters.h"
 #include "cache.h"
@@ -14,6 +17,24 @@
 
 namespace kairos_space
 { 
+class PrefetchTable {
+public:
+  struct Entry {
+    uint64_t addr;
+    uint64_t offset;
+  };
+
+  PrefetchTable(std::size_t table_max_size);
+
+  void insert(const Entry& entry);
+  std::optional<Entry> lookup(uint64_t addr) const;
+  void remove(uint64_t addr);
+
+private:
+  std::deque<Entry> table;
+  std::size_t max_size;
+};
+
 class KAIROS
 {
 private:
@@ -27,22 +48,15 @@ private:
 
   std::vector<uint64_t> rrTable;
 
-  struct PrefetchTableEntry {
-    uint64_t addr;
-    uint64_t offset;
-
-    uint64_t index() const { return addr; }  // Set index
-    uint64_t tag() const { return addr; }  // Tag 
-  };
-
-  champsim::msl::lru_table<PrefetchTableEntry> prefetch_table;
+  PrefetchTable prefetch_table;
 
   /** Structure to save the offset and the score */
   typedef std::pair<int16_t, uint8_t> OffsetListEntry;
   std::vector<OffsetListEntry> offsetsList;
 
-  /** Current best offset to issue prefetches */
-  uint64_t bestOffset;
+  std::array<int64_t, NUM_OFFSETS> learned_offsets = {1};
+  unsigned int current_learning_offset_idx = 0;
+
   /** Current best offset found in the learning phase */
   uint64_t phaseBestOffset;
   /** Current test offset index */
@@ -79,8 +93,11 @@ private:
   bool testRR(uint64_t addr_tag) const;
 
 public:
-  /** The prefetch degree, i.e. the number of prefetches to generate */
-  unsigned int degree;
+  /** Total number of pf issued */
+  unsigned int pf_issued_kairos = 0;
+
+  /** Total number of useful pf */
+  unsigned int pf_useful_kairos = 0;
 
   /** Hardware prefetcher enabled */
   bool issuePrefetchRequests;
@@ -93,6 +110,8 @@ public:
   void bestOffsetLearning(uint64_t addr);
 
   uint64_t calculatePrefetchAddr(uint64_t addr);
+
+  std::vector<uint64_t> calculatePrefetchAddrs(uint64_t addr);
 
   void insertFill(uint64_t addr);
 
