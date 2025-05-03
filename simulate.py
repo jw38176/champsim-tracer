@@ -19,15 +19,11 @@ SIMULATION_INSTRUCTIONS = 2
 parser = argparse.ArgumentParser(description='Run ChampSim on SPEC2017 benchmarks')
 
 parser.add_argument('--benchmark', type=str, help='Benchmark to run', required=True)
-
 parser.add_argument('--name', type=str, help='Directoy name to store the result', required=False)
-
 parser.add_argument('--config', type=str, help='Configuration file', required=False)
-
 parser.add_argument('--clean', action='store_true', help='Clean the build', required=False)
-
-parser.add_argument('--run', action='store_true', help='Skip configuration and build process', required=False) 
-
+parser.add_argument('--no_conf', action='store_true', help='Skip configuration (Still Make)', required=False) 
+parser.add_argument('--cppflags', type=str, help='Extra CPPFLAGS to pass to make (e.g. "-DKAIROS_DBUG -DTEST_DBUG")', required=False, default="")
 
 args = parser.parse_args()
 
@@ -48,7 +44,7 @@ if not args.name: # Auto parse the name of the L2C prefetcher
 else: 
     prefetcher = args.name
 
-if not args.run:
+if not args.no_conf:
     # Update configuration
     print("======================") 
     print("Updating Configuration")
@@ -61,26 +57,30 @@ if not args.run:
         print("Configuration failed")
         sys.exit(1)
         
-    print("**********************") 
-    print(f"Prefetcher: {prefetcher_selected}")
-    print(f"Name: {prefetcher}")
-    print("**********************")
+print("**********************") 
+print(f"Prefetcher: {prefetcher_selected}")
+print(f"Name: {prefetcher}")
+print("**********************")
 
-    # Make
-    print("=================")
-    print("Building ChampSim")
-    print("=================")
-    if args.clean:
-        result = subprocess.run(["make", "clean"])
-        if result.returncode != 0:
-            print("Clean failed")
-            sys.exit(1)
-        result = subprocess.run(["make"])
-    else: 
-        result = subprocess.run(["make"])
+# Make
+print("=================")
+print("Building ChampSim")
+print("=================")
+
+if args.clean:
+    result = subprocess.run(["make", "clean"])
     if result.returncode != 0:
-        print("Build failed")
+        print("Clean failed")
         sys.exit(1)
+
+make_cmd = ["make"]
+if args.cppflags:
+    make_cmd.append(f"EXTRA_CPPFLAGS={args.cppflags}")
+
+result = subprocess.run(make_cmd)
+if result.returncode != 0:
+    print("Build failed")
+    sys.exit(1)
 
 # Run simulation for all benchmarks in parallel 
 print("==================")

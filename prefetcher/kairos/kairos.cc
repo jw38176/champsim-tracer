@@ -4,7 +4,6 @@
 
 using namespace kairos_space;
 
-
 PrefetchTable::PrefetchTable(std::size_t table_max_size)
   : max_size(table_max_size) {}
 
@@ -36,16 +35,13 @@ void PrefetchTable::remove(uint64_t addr) {
 
 KAIROS::KAIROS()
     : scoreMax(SCORE_MAX), roundMax(ROUND_MAX), badScore(BAD_SCORE), rrEntries(RR_SIZE), tagMask((1 << TAG_BITS) - 1),
-      issuePrefetchRequests(true), prefetch_table(PREFETCH_TABLE_SIZE), phaseBestOffset(0), bestScore(0), round(0)
+      prefetch_table(PREFETCH_TABLE_SIZE), phaseBestOffset(0), bestScore(0), round(0)
 {
   if (!champsim::msl::isPowerOf2(rrEntries)) {
     throw std::invalid_argument{"Number of RR entries is not power of 2\n"};
   }
   if (!champsim::msl::isPowerOf2(BLOCK_SIZE)) {
     throw std::invalid_argument{"Cache line size is not power of 2\n"};
-  }
-  if (NEGATIVE_OFFSETS_ENABLE && (OFFSET_LIST_SIZE % 2 != 0)) {
-    throw std::invalid_argument{"Negative offsets enabled with odd offset list size\n"};
   }
 
   rrTable.resize(rrEntries);
@@ -70,14 +66,6 @@ KAIROS::KAIROS()
     if (offset == 1) {
       offsetsList.push_back(OffsetListEntry(offset_i, 0));
       i++;
-      /*
-       * If we want to use negative offsets, add also the negative value
-       * of the offset just calculated
-       */
-      if (NEGATIVE_OFFSETS_ENABLE) {
-        offsetsList.push_back(OffsetListEntry(-offset_i, 0));
-        i++;
-      }
     }
 
     offset_i++;
@@ -204,8 +192,6 @@ std::vector<uint64_t> KAIROS::calculatePrefetchAddrs(uint64_t addr)
 
     uint64_t pf_addr = addr + (offset << LOG2_BLOCK_SIZE);
 
-    // prefetch_table.remove(PrefetchTableEntry{addr, matched_offset}); 
-
     if ((addr >> LOG2_PAGE_SIZE) != (pf_addr >> LOG2_PAGE_SIZE))
     {
       if constexpr (champsim::kairos_dbug) 
@@ -248,12 +234,10 @@ void KAIROS::insertFill(uint64_t addr)
 
     uint64_t tag_y = tag(base_address);
 
-    if (issuePrefetchRequests) {
-      insertIntoRR(addr, tag_y);
-      if constexpr (champsim::kairos_dbug) 
-      {
-        std::cout << "Filled RR" << std::endl;
-      }
+    insertIntoRR(addr, tag_y);
+    if constexpr (champsim::kairos_dbug) 
+    {
+      std::cout << "Filled RR" << std::endl;
     }
   }
   else {
@@ -275,28 +259,44 @@ void CACHE::prefetcher_initialize()
 // type : 0 for load
 uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cache_hit, bool useful_prefetch, uint8_t type, uint32_t metadata_in)
 {
-  if (type != 0) {
+  if (type != champsim::to_underlying(access_type::LOAD)) {
     return metadata_in; // Not a load
   }
 
   if ((cache_hit && useful_prefetch) || !cache_hit) {
-    // increment useful prefetch counter, not quite the same as cache stat since we don't remove the prefetch tag, could change to increment sim stats here
-    // also missing mshr hit
+    // increment useful prefetch counter, not quite the same as cache stat since we don't remove the prefetch tag 
     if(cache_hit && useful_prefetch) { kairos->pf_useful_kairos++; }
+
+    // Check MSHR for prefetched line
+    if(!cache_hit) {
+      auto mshr_entry = std::find_if(std::begin(this->MSHR), std::end(this->MSHR), [match = addr >> this->OFFSET_BITS, shamt = this->OFFSET_BITS](const auto& entry) {
+        return (entry.address >> shamt) == match;
+      });
+      // bool mshr_full = (this->MSHR.size() == this->MSHR_SIZE);
+    
+      if (mshr_entry != this->MSHR.end()) // miss already inflight
+      {
+        if (mshr_entry->type == access_type::PREFETCH && type != champsim::to_underlying(access_type::PREFETCH)) { // Redundant check for prefetch type but left for clarity
+          // Mark the prefetch as useful
+          if (mshr_entry->prefetch_from_this)
+            kairos->pf_useful_kairos++;
+        }
+      }
+    }
+
     kairos->bestOffsetLearning(addr);
 
-    if (kairos->issuePrefetchRequests) {
-      auto pf_addrs = kairos->calculatePrefetchAddrs(addr);
-      
-      for (auto pf_addr : pf_addrs) {
-        std::vector<std::size_t> pq_occupancy = get_pq_occupancy();
-        // std::cout << "pq_occupany: " << pq_occupancy[2] << std::endl;
-        // Compare l2C pq size to check if pf will be issued
-        // if (pq_occupancy[2] < PQ_SIZE){ 
-        //   ++(kairos->pf_issued_kairos);
-        // }
-        bool issued = prefetch_line(pf_addr, true, metadata_in);
-        if (issued) {++(kairos->pf_issued_kairos);} else {std::cout << "pq_occupany: " << pq_occupancy[2] << "PQ FULL" << std::endl;}
+    auto pf_addrs = kairos->calculatePrefetchAddrs(addr);
+    
+    for (auto pf_addr : pf_addrs) {
+      bool issued = prefetch_line(pf_addr, true, metadata_in);
+      if (issued) {
+        ++(kairos->pf_issued_kairos);
+      } else {
+        if constexpr (champsim::kairos_dbug) {
+          std::vector<std::size_t> pq_occupancy = get_pq_occupancy();
+          std::cout << "PQ FULL, pq_occupany: " << pq_occupancy[2] << std::endl;
+        }
       }
     }
   }

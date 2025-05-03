@@ -54,7 +54,7 @@ private:
   typedef std::pair<int16_t, uint8_t> OffsetListEntry;
   std::vector<OffsetListEntry> offsetsList;
 
-  std::array<int64_t, NUM_OFFSETS> learned_offsets = {1};
+  std::array<uint64_t, NUM_OFFSETS> learned_offsets = {1};
   unsigned int current_learning_offset_idx = 0;
 
   /** Current best offset found in the learning phase */
@@ -98,9 +98,6 @@ public:
 
   /** Total number of useful pf */
   unsigned int pf_useful_kairos = 0;
-
-  /** Hardware prefetcher enabled */
-  bool issuePrefetchRequests;
 
   /** Learning phase of the BOP. Update the intermediate values of the
    * round and update the best offset if found

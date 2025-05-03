@@ -44,6 +44,12 @@ constexpr bool kairos_dbug = true;
 #else
 constexpr bool kairos_dbug = false;
 #endif
+
+#ifdef TEST_DBUG
+constexpr bool test_dbug = true;
+#else
+constexpr bool test_dbug = false;
+#endif
 } // namespace champsim
 
 #endif

@@ -15,11 +15,6 @@ namespace kairos_space
   # define OFFSET_LIST_SIZE     (26)  // Number of entries in the offsets list
   # define NUM_OFFSETS          (1)   // The number of offsets that are learnt
 
-  constexpr std::size_t PREFETCH_TABLE_SIZE = 128;
-  // # define PREFETCH_TABLE_WAYS  (1)   // Number of ways in the recent prefetches table
-
-  # define NEGATIVE_OFFSETS_ENABLE  (false) // Initialize the offsets list also with negative values \
-                                            (i.e. the table will have half of the entries with positive \
-                                            offsets and the other half with negative ones)
+  constexpr std::size_t PREFETCH_TABLE_SIZE = 128; // Size of the recent prefetches table
 };
 # endif
