@@ -97,7 +97,7 @@ bool BOP::testRR(uint64_t addr_tag) const
 
 void BOP::bestOffsetLearning(uint64_t addr)
 {
-  uint64_t offset = (*offsetsListIterator).first;
+  int64_t offset = (*offsetsListIterator).first;
 
   /*
    * Compute the lookup tag for the RR table. As tags are generated using
@@ -110,7 +110,7 @@ void BOP::bestOffsetLearning(uint64_t addr)
   if (testRR(lookup_tag)) {
     if constexpr (champsim::bop_debug) 
     {
-      std::cout << "Address " << lookup_tag << " found in the RR table" << std::endl;
+      std::cout << "Tag " << lookup_tag << " found in the RR table" << std::endl;
     }
     (*offsetsListIterator).second++;
     if ((*offsetsListIterator).second > bestScore) {

@@ -28,13 +28,13 @@ private:
   std::vector<uint64_t> rrTable;
 
   /** Structure to save the offset and the score */
-  typedef std::pair<int16_t, uint8_t> OffsetListEntry;
+  typedef std::pair<int64_t, uint8_t> OffsetListEntry;
   std::vector<OffsetListEntry> offsetsList;
 
   /** Current best offset to issue prefetches */
-  uint64_t bestOffset;
+  int64_t bestOffset;
   /** Current best offset found in the learning phase */
-  uint64_t phaseBestOffset;
+  int64_t phaseBestOffset;
   /** Current test offset index */
   std::vector<OffsetListEntry>::iterator offsetsListIterator;
   /** Max score found so far */
