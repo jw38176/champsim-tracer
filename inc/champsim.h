@@ -33,7 +33,7 @@ constexpr bool debug_print = true;
 constexpr bool debug_print = false;
 #endif
 
-#ifdef BOP_DEBUG
+#ifdef BOP_DBUG
 constexpr bool bop_debug = true;
 #else
 constexpr bool bop_debug = false;

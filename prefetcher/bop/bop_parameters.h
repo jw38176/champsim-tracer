@@ -12,10 +12,11 @@ namespace bop_space
   # define BAD_SCORE            (10)  // Score at which the HWP is disabled
   # define RR_SIZE              (64)  // Number of entries in RR Table
   # define TAG_BITS             (12)  // Bits used to store the tag
-  # define OFFSET_LIST_SIZE     (46)  // Number of entries in the offsets list
+  # define OFFSET_LIST_SIZE     (26)  // Number of entries in the offsets list
 
-  # define NEGATIVE_OFFSETS_ENABLE    (false) // Initialize the offsets list also with negative values \
-                                              (i.e. the table will have half of the entries with positive \
-                                              offsets and the other half with negative ones)
+  // Toggle to include negative offsets in the offset list
+  // If enabled, half of the offset list will contain negative offsets.     
+  #define NEGATIVE_OFFSETS_ENABLE (false) 
 };
-# endif
+
+# endif // _BOP_PARAMETERS_H_

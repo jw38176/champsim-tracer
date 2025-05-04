@@ -6,7 +6,7 @@ using namespace bop_space;
 
 BOP::BOP()
     : scoreMax(SCORE_MAX), roundMax(ROUND_MAX), badScore(BAD_SCORE), rrEntries(RR_SIZE), tagMask((1 << TAG_BITS) - 1),
-      issuePrefetchRequests(true), bestOffset(1), phaseBestOffset(0), bestScore(0), round(0), degree(1)
+      bestOffset(0), phaseBestOffset(0), bestScore(0), round(0), issuePrefetchRequests(false)
 {
   if (!champsim::msl::isPowerOf2(rrEntries)) {
     throw std::invalid_argument{"Number of RR entries is not power of 2\n"};
@@ -103,7 +103,7 @@ void BOP::bestOffsetLearning(uint64_t addr)
    * Compute the lookup tag for the RR table. As tags are generated using
    * lower 12 bits we subtract offset from the full address rather than the
    * tag to avoid integer underflow.
-   */
+  */
   uint64_t lookup_tag = tag((addr) - (offset << LOG2_BLOCK_SIZE));
 
   // There was a hit in the RR table, increment the score for this offset
@@ -161,22 +161,48 @@ void BOP::bestOffsetLearning(uint64_t addr)
   }
 }
 
-uint64_t BOP::calculatePrefetchAddr(uint64_t addr)
+std::optional<uint64_t> BOP::calculatePrefetchAddr(uint64_t addr)
 {
-  return addr + (bestOffset << LOG2_BLOCK_SIZE);
-}
+  uint64_t pf_addr = addr + (bestOffset << LOG2_BLOCK_SIZE);
 
-void BOP::insertFill(uint64_t addr)
-{
-  uint64_t tag_y = tag((addr) - (bestOffset << LOG2_BLOCK_SIZE));
-  
-  if (issuePrefetchRequests) {
-    insertIntoRR(addr, tag_y);
+  if ((addr >> LOG2_PAGE_SIZE) != (pf_addr >> LOG2_PAGE_SIZE))
+  {
     if constexpr (champsim::bop_debug) 
     {
-      std::cout << "Filled RR" << bestOffset << std::endl;
+      std::cout << "Prefetch not issued - Page crossed" << std::endl;
     }
+    return std::nullopt;
+  } 
+
+  if constexpr (champsim::bop_debug) {
+    std::cout << "Generated prefetch: " << pf_addr << std::endl;
   }
+  return pf_addr;
+}
+
+void BOP::insertFill(uint64_t addr, uint8_t prefetch)
+{
+  if (issuePrefetchRequests && prefetch) {
+    uint64_t base_address = addr - (bestOffset << LOG2_BLOCK_SIZE);
+
+    if ((base_address >> LOG2_PAGE_SIZE) != (addr >> LOG2_PAGE_SIZE))
+    {
+      if constexpr (champsim::bop_debug) 
+      {
+        std::cout << "Filled address not inserted in RR - Crossed Page" << std::endl;
+      }
+      return;
+    }
+    uint64_t tag_base = tag(base_address);
+    insertIntoRR(addr, tag_base);
+  } else if (!prefetch) {
+    /*
+     * We insert the fetched line into the RR table when prefetch is off, 
+     * (i.e. D = 0)
+    */
+    insertIntoRR(addr, tag(addr));
+  }
+  return;
 }
 
 void CACHE::prefetcher_initialize() 
@@ -186,12 +212,12 @@ void CACHE::prefetcher_initialize()
 }
 
 // addr: address of cache block
-// ip: PC of load/store cache_hit: true if load/store hits in cache.
-// type : 0 for load
+// ip: PC of load/store 
+// cache_hit: true if load/store hits in cache.
 uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cache_hit, bool useful_prefetch, uint8_t type, uint32_t metadata_in)
 {
-  if (type != 0) {
-    return metadata_in; // access is not a load
+  if (type != champsim::to_underlying(access_type::LOAD)) {
+    return metadata_in; // Not a load
   }
 
   if ((cache_hit && useful_prefetch) || !cache_hit) {
@@ -202,11 +228,9 @@ uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cac
     bop->bestOffsetLearning(addr);
 
     if (bop->issuePrefetchRequests) {
-      uint64_t pf_addr = bop->calculatePrefetchAddr(addr);
-      prefetch_line(pf_addr, true, metadata_in);
-      if constexpr (champsim::bop_debug) 
-      {
-        std::cout << "Generated Prefetch " << pf_addr << std::endl;
+      auto pf_addr = bop->calculatePrefetchAddr(addr);
+      if (pf_addr.has_value()) {
+        prefetch_line(*pf_addr, true, metadata_in);
       }
     }
   }
@@ -219,10 +243,7 @@ uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cac
 // set and way of allocated entry
 uint32_t CACHE::prefetcher_cache_fill(uint64_t addr, uint32_t set, uint32_t way, uint8_t prefetch, uint64_t evicted_addr, uint32_t metadata_in)
 {
-  // Only insert into the RR Table if fill is a hardware prefetch
-  if (prefetch){
-    bop->insertFill(addr);
-  }
+  bop->insertFill(addr, prefetch);
 
   return metadata_in;
 }

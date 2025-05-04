@@ -6,6 +6,7 @@
 #include <queue>
 #include <stdlib.h>
 #include <vector>
+#include <optional>
 
 #include "bop_parameters.h"
 #include "cache.h"
@@ -68,9 +69,6 @@ private:
   bool testRR(uint64_t addr_tag) const;
 
 public:
-  /** The prefetch degree, i.e. the number of prefetches to generate */
-  unsigned int degree;
-
   /** Hardware prefetcher enabled */
   bool issuePrefetchRequests;
 
@@ -81,9 +79,9 @@ public:
    */
   void bestOffsetLearning(uint64_t addr);
 
-  uint64_t calculatePrefetchAddr(uint64_t addr);
+  std::optional<uint64_t> calculatePrefetchAddr(uint64_t addr);
 
-  void insertFill(uint64_t addr);
+  void insertFill(uint64_t addr, uint8_t prefetch);
 
   BOP();
   ~BOP() = default;
