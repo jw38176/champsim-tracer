@@ -12,8 +12,8 @@ from concurrent.futures import ThreadPoolExecutor
 from _SPEC2017_def import SPEC2017_SHORTCODE, SPEC2017_PATH
 
 # Define the warmup and instructions to run (in millions)
-WARMUP_INSTRUCTIONS = 0
-SIMULATION_INSTRUCTIONS = 2
+WARMUP_INSTRUCTIONS = 0 #50
+SIMULATION_INSTRUCTIONS = 2 #200
 
 # Parse arguments
 parser = argparse.ArgumentParser(description='Run ChampSim on SPEC2017 benchmarks')
@@ -23,7 +23,7 @@ parser.add_argument('--name', type=str, help='Directoy name to store the result'
 parser.add_argument('--config', type=str, help='Configuration file', required=False)
 parser.add_argument('--clean', action='store_true', help='Clean the build', required=False)
 parser.add_argument('--no_conf', action='store_true', help='Skip configuration (Still Make)', required=False) 
-parser.add_argument('--cppflags', type=str, help='Extra CPPFLAGS to pass to make (e.g. "-DKAIROS_DBUG -DTEST_DBUG")', required=False, default="")
+parser.add_argument('--cppflags', type=str, help='Extra CPPFLAGS to pass to make (e.g. "-DKAIROS_DBUG -DTEST_DBUG")', required=False)
 
 args = parser.parse_args()
 

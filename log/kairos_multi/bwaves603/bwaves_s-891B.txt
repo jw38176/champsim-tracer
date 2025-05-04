@@ -10,8 +10,8 @@ KAIROS Prefetcher Initialise
 Off-chip DRAM Size: 4 GiB Channels: 1 Width: 64-bit Data Race: 3200 MT/s
 Warmup finished CPU 0 instructions: 0 cycles: 1 cumulative IPC: 0 (Simulation time: 00 hr 00 min 00 sec)
 Warmup complete CPU 0 instructions: 0 cycles: 1 cumulative IPC: 0 (Simulation time: 00 hr 00 min 00 sec)
-Simulation finished CPU 0 instructions: 2000003 cycles: 4085677 cumulative IPC: 0.4895 (Simulation time: 00 hr 00 min 16 sec)
-Simulation complete CPU 0 instructions: 2000003 cycles: 4085677 cumulative IPC: 0.4895 (Simulation time: 00 hr 00 min 16 sec)
+Simulation finished CPU 0 instructions: 2000003 cycles: 4085677 cumulative IPC: 0.4895 (Simulation time: 00 hr 00 min 17 sec)
+Simulation complete CPU 0 instructions: 2000003 cycles: 4085677 cumulative IPC: 0.4895 (Simulation time: 00 hr 00 min 17 sec)
 
 ChampSim completed all CPUs
 
