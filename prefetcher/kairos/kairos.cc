@@ -34,7 +34,7 @@ void PrefetchTable::remove(uint64_t addr) {
 }
 
 KAIROS::KAIROS()
-    : scoreMax(SCORE_MAX), roundMax(ROUND_MAX), badScore(BAD_SCORE), rrEntries(RR_SIZE), tagMask((1 << TAG_BITS) - 1),
+    : scoreMax(SCORE_MAX), roundMax(ROUND_MAX), rrEntries(RR_SIZE), tagMask((1 << TAG_BITS) - 1),
       prefetch_table(PREFETCH_TABLE_SIZE), phaseBestOffset(0), bestScore(0), round(0)
 {
   if (!champsim::msl::isPowerOf2(rrEntries)) {

@@ -41,7 +41,6 @@ private:
   /** Learning phase parameters */
   const unsigned int scoreMax;
   const unsigned int roundMax;
-  const unsigned int badScore;
   /** Recent requests table parameteres */
   const unsigned int rrEntries;
   const unsigned int tagMask;
