@@ -81,7 +81,7 @@ public:
 
   std::optional<uint64_t> calculatePrefetchAddr(uint64_t addr);
 
-  void insertFill(uint64_t addr, uint8_t prefetch);
+  void insertFill(uint64_t addr, uint8_t prefetch, uint32_t metadata_in);
 
   BOP();
   ~BOP() = default;

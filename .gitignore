@@ -22,3 +22,6 @@ vcpkg_installed/
 .vscode
 
 SPEC_quick
+log
+figures
+results

@@ -180,9 +180,9 @@ std::optional<uint64_t> BOP::calculatePrefetchAddr(uint64_t addr)
   return pf_addr;
 }
 
-void BOP::insertFill(uint64_t addr, uint8_t prefetch)
+void BOP::insertFill(uint64_t addr, uint8_t prefetch, uint32_t metadata_in)
 {
-  if (issuePrefetchRequests && prefetch) {
+  if (issuePrefetchRequests && prefetch && metadata_in == 2) {
     uint64_t base_address = addr - (bestOffset << LOG2_BLOCK_SIZE);
 
     if ((base_address >> LOG2_PAGE_SIZE) != (addr >> LOG2_PAGE_SIZE))
@@ -195,7 +195,7 @@ void BOP::insertFill(uint64_t addr, uint8_t prefetch)
     }
     uint64_t tag_base = tag(base_address);
     insertIntoRR(addr, tag_base);
-  } else if (!prefetch) {
+  } else if (!prefetch && !issuePrefetchRequests) {
     /*
      * We insert the fetched line into the RR table when prefetch is off, 
      * (i.e. D = 0)
@@ -230,7 +230,7 @@ uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cac
     if (bop->issuePrefetchRequests) {
       auto pf_addr = bop->calculatePrefetchAddr(addr);
       if (pf_addr.has_value()) {
-        prefetch_line(*pf_addr, true, metadata_in);
+        prefetch_line(*pf_addr, true, 2);
       }
     }
   }
@@ -243,7 +243,7 @@ uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cac
 // set and way of allocated entry
 uint32_t CACHE::prefetcher_cache_fill(uint64_t addr, uint32_t set, uint32_t way, uint8_t prefetch, uint64_t evicted_addr, uint32_t metadata_in)
 {
-  bop->insertFill(addr, prefetch);
+  bop->insertFill(addr, prefetch, metadata_in);
 
   return metadata_in;
 }

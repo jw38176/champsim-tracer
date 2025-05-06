@@ -9,11 +9,11 @@ import os
 import json 
 from concurrent.futures import ThreadPoolExecutor
 
-from _SPEC2017_def import SPEC2017_SHORTCODE, SPEC2017_PATH
+from _SPEC2017_def_ALL_ import SPEC2017_SHORTCODE, SPEC2017_PATH
 
 # Define the warmup and instructions to run (in millions)
-WARMUP_INSTRUCTIONS = 0 #50
-SIMULATION_INSTRUCTIONS = 2 #200
+WARMUP_INSTRUCTIONS = 50
+SIMULATION_INSTRUCTIONS = 200
 
 # Parse arguments
 parser = argparse.ArgumentParser(description='Run ChampSim on SPEC2017 benchmarks')
