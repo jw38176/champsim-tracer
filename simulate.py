@@ -1,6 +1,4 @@
-#!/bin/python3 
-
-# *NOTE: the auto parsing of this script assumes that the prefetcher is working in the L2C cache, unless specified by the 'name' option 
+#!/bin/python3  
 
 import subprocess
 import argparse 
@@ -9,18 +7,18 @@ import os
 import json 
 from concurrent.futures import ThreadPoolExecutor
 
-from _SPEC2017_def_ALL_ import SPEC2017_SHORTCODE, SPEC2017_PATH
+from _SPEC2017_def import SPEC2017_SHORTCODE, SPEC2017_PATH
 
 # Define the warmup and instructions to run (in millions)
-WARMUP_INSTRUCTIONS = 50
-SIMULATION_INSTRUCTIONS = 200
+WARMUP_INSTRUCTIONS = 0
+SIMULATION_INSTRUCTIONS = 2
 
 # Parse arguments
 parser = argparse.ArgumentParser(description='Run ChampSim on SPEC2017 benchmarks')
 
 parser.add_argument('--benchmark', type=str, help='Benchmark to run', required=True)
-parser.add_argument('--name', type=str, help='Directoy name to store the result', required=False)
 parser.add_argument('--config', type=str, help='Configuration file', required=False)
+parser.add_argument('--name', type=str, help='Optional name for result directory', required=False)
 parser.add_argument('--clean', action='store_true', help='Clean the build', required=False)
 parser.add_argument('--no_conf', action='store_true', help='Skip configuration (Still Make)', required=False) 
 parser.add_argument('--cppflags', type=str, help='Extra CPPFLAGS to pass to make (e.g. "-DKAIROS_DBUG -DTEST_DBUG")', required=False)
@@ -34,31 +32,31 @@ if args.benchmark not in SPEC2017_SHORTCODE:
 
 prefetcher = "misc" # Default 
 
-config_path = args.config if args.config else "test_config.json"
+config_path = args.config if args.config else "no_prefetch.json"
 with open(config_path) as config_file:
     config = json.load(config_file)
-    prefetcher_selected = config["L2C"]["prefetcher"]
+    prefetcher_selected_L1 = config["L1D"]["prefetcher"]
+    prefetcher_selected_L2 = config["L2C"]["prefetcher"]
 
-if not args.name: # Auto parse the name of the L2C prefetcher
-    prefetcher = prefetcher_selected
-else: 
-    prefetcher = args.name
+if args.config:
+  if not args.name: # Auto parse the name of the prefetchers
+      prefetcher = f"{prefetcher_selected_L1}-{prefetcher_selected_L2}"
+  else: 
+      prefetcher = args.name
+else: prefetcher = "no"
 
 if not args.no_conf:
     # Update configuration
     print("======================") 
     print("Updating Configuration")
     print("======================")
-    if args.config:
-        result = subprocess.run(["./config.sh", args.config])
-    else: 
-        result = subprocess.run(["./config.sh", "test_config.json"])
+    result = subprocess.run(["./config.sh", config_path])
     if result.returncode != 0:
         print("Configuration failed")
         sys.exit(1)
         
 print("**********************") 
-print(f"Prefetcher: {prefetcher_selected}")
+print(f"Prefetchers Selected:  L1={prefetcher_selected_L1}  L2={prefetcher_selected_L2}")
 print(f"Name: {prefetcher}")
 print("**********************")
 
