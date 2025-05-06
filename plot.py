@@ -7,7 +7,7 @@ from collections import defaultdict
 plt.style.use(["science", "light", "no-latex"])
 
 # --- CONFIGURABLE ---
-LOG_DIR = 'log'
+LOG_DIR = 'results'
 BENCHMARKS = ['cactusADM436', 'xalancbmk623']
 PREFETCHERS = ['no', 'bop_stride_metadata', 'berti']
 SIMPOINTS = []  # Will be auto-filled with (benchmark/simpoint)

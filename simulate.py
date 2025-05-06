@@ -96,14 +96,14 @@ for i, benchmark in enumerate(SPEC2017_SHORTCODE[args.benchmark]):
     kernel_args.append((benchmark, i, len(SPEC2017_SHORTCODE[args.benchmark]) - 1))
 
 # Make output directory 
-if not os.path.exists(f"log/{prefetcher}/{args.benchmark}"):
-        os.makedirs(f"log/{prefetcher}/{args.benchmark}")
+if not os.path.exists(f"results/{prefetcher}/{args.benchmark}"):
+        os.makedirs(f"results/{prefetcher}/{args.benchmark}")
 
 def champsim_kernel(kernel_arg):
 
     (benchmark, job_number, total) = kernel_arg
 
-    with open(f"log/{prefetcher}/{args.benchmark}/{benchmark.split('.')[1]}.txt", "w+") as output_file:
+    with open(f"results/{prefetcher}/{args.benchmark}/{benchmark.split('.')[1]}.txt", "w+") as output_file:
         print(f"Dispatching {benchmark} ... [{job_number+1} / {total+1}]")
         result = subprocess.run([
             "./bin/champsim", 
