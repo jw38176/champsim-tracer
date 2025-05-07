@@ -125,15 +125,19 @@ void KAIROS::bestOffsetLearning(uint64_t addr)
    * This can be changed to store offset in cache/shadowcache and checking this way
   */
 
-
   // Skip learning if any of the already-learned offsets covered this addr
   for (std::size_t i = 0; i < learned_offsets.size(); ++i) {
     if (i == current_learning_offset_idx) continue; // skip the offset we're learning
+
     uint64_t off = learned_offsets[i];
     if (off == 0) continue; // unused slot
+
     uint64_t prev_pf_addr = addr - (off << LOG2_BLOCK_SIZE);
     if (testRR(tag(prev_pf_addr))) {
-        return; // Already covered by another learned offset
+      return; // Already covered by another learned offset
+      if constexpr (champsim::test_dbug) {
+        std::cout << "Load covered by offset" << std::endl;
+      }
     }
   }
 
@@ -168,9 +172,17 @@ void KAIROS::bestOffsetLearning(uint64_t addr)
   // Learning phase end
   if ((bestScore >= scoreMax) || (round >= roundMax)) {
     learned_offsets[current_learning_offset_idx] = phaseBestOffset;
-    if constexpr (champsim::kairos_dbug) {
+    if constexpr (champsim::test_dbug) {
       std::cout << "Learned new offset #" << current_learning_offset_idx << ": " << phaseBestOffset << std::endl;
     }
+
+    // Reset statistics for this offset
+    offset_issued[phaseBestOffset] = 0;
+    offset_useful[phaseBestOffset] = 0;
+    offset_accuracy_log[phaseBestOffset].clear();
+
+    // Un-suppress the offset if previously suppressed
+    suppressed_offsets.erase(phaseBestOffset);
 
     // Move to next learning slot (wrap 0–3)
     current_learning_offset_idx = (current_learning_offset_idx + 1) % learned_offsets.size();
@@ -183,12 +195,12 @@ void KAIROS::bestOffsetLearning(uint64_t addr)
   }
 }
 
-std::vector<uint64_t> KAIROS::calculatePrefetchAddrs(uint64_t addr)
+std::vector<std::pair<uint64_t, uint64_t>> KAIROS::calculatePrefetchAddrs(uint64_t addr)
 {
-  std::vector<uint64_t> pf_addrs;
+  std::vector<std::pair<uint64_t, uint64_t>> pf_addrs;
 
   for (auto offset : learned_offsets) {
-    if (offset == 0) continue; // Skip unused slots
+    if (offset == 0 || suppressed_offsets.count(offset)) continue;
 
     uint64_t pf_addr = addr + (offset << LOG2_BLOCK_SIZE);
 
@@ -204,7 +216,7 @@ std::vector<uint64_t> KAIROS::calculatePrefetchAddrs(uint64_t addr)
     PrefetchTable::Entry entry{pf_addr, offset};
     prefetch_table.insert(entry);
 
-    pf_addrs.push_back(pf_addr);
+    pf_addrs.emplace_back(pf_addr, offset);
 
     if constexpr (champsim::kairos_dbug) {
       std::cout << "Generated prefetch: " << pf_addr << " with offset " << offset << std::endl;
@@ -217,6 +229,16 @@ std::vector<uint64_t> KAIROS::calculatePrefetchAddrs(uint64_t addr)
 void KAIROS::insertFill(uint64_t addr)
 {
   auto result = prefetch_table.lookup(addr);
+  bool all_suppressed = true;
+
+  // Check if all active learned offsets are suppressed
+  for (uint64_t offset : learned_offsets) {
+    if (offset != 0 && suppressed_offsets.find(offset) == suppressed_offsets.end()) {
+      all_suppressed = false;
+      break;
+    }
+  }
+
   if (result.has_value()) {
     uint64_t matched_offset = result->offset;
 
@@ -240,10 +262,43 @@ void KAIROS::insertFill(uint64_t addr)
       std::cout << "Filled RR" << std::endl;
     }
   }
+  else if (all_suppressed) {
+    // Insert into RR table even without prefetch match if all offsets are suppressed
+    uint64_t tag_y = tag(addr);
+    insertIntoRR(addr, tag_y);
+
+    if constexpr (champsim::kairos_dbug) {
+      std::cout << "Filled RR fallback due to all offsets suppressed" << std::endl;
+    }
+  }
   else {
     if constexpr (champsim::kairos_dbug) 
     {
       std::cout << "Filled addr not found in recent prefetches" << std::endl;
+    }
+  }
+}
+
+void KAIROS::recordAccuracy() {
+  for (const uint64_t offset: learned_offsets) {
+    if (offset == 0) continue; // skip unused
+
+    uint64_t issued = offset_issued[offset];
+    uint64_t useful = offset_useful[offset];
+    double acc = issued > 0 ? static_cast<double>(useful) / issued : 0.0;
+    offset_accuracy_log[offset].push_back(acc);
+
+    if (acc < 0.3) {
+      suppressed_offsets.insert(offset);
+    }
+
+    if constexpr (champsim::test_dbug) {
+      std::cout << "[Accuracy] Offset: " << offset
+                << ", Issued: " << issued
+                << ", Useful: " << useful
+                << ", Accuracy: " << acc
+                << (suppressed_offsets.count(offset) ? " (SUPPRESSED)" : "")
+                << std::endl;
     }
   }
 }
@@ -265,7 +320,14 @@ uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cac
 
   if ((cache_hit && useful_prefetch) || !cache_hit) {
     // increment useful prefetch counter, not quite the same as cache stat since we don't remove the prefetch tag 
-    if(cache_hit && useful_prefetch) { kairos->pf_useful_kairos++; }
+    if(cache_hit && useful_prefetch) { 
+      kairos->pf_useful_kairos++; 
+
+      auto result = kairos->prefetch_table.lookup(addr);
+      if (result.has_value()) {
+        kairos->offset_useful[result->offset]++;
+      }
+    }
 
     // Check MSHR for prefetched line
     if(!cache_hit) {
@@ -288,10 +350,11 @@ uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cac
 
     auto pf_addrs = kairos->calculatePrefetchAddrs(addr);
     
-    for (auto pf_addr : pf_addrs) {
+    for (auto [pf_addr, offset] : pf_addrs) {
       bool issued = prefetch_line(pf_addr, true, metadata_in);
       if (issued) {
         ++(kairos->pf_issued_kairos);
+        kairos->offset_issued[offset]++;
       } else {
         if constexpr (champsim::kairos_dbug) {
           std::vector<std::size_t> pq_occupancy = get_pq_occupancy();
@@ -317,7 +380,13 @@ uint32_t CACHE::prefetcher_cache_fill(uint64_t addr, uint32_t set, uint32_t way,
   return metadata_in;
 }
 
-void CACHE::prefetcher_cycle_operate() {}
+void CACHE::prefetcher_cycle_operate() {
+  static uint64_t cycle_counter = 0;
+  cycle_counter++;
+  if (cycle_counter % 100000 == 0) {
+      kairos->recordAccuracy();
+  }
+}
 
 void CACHE::prefetcher_final_stats() {
   std::cout << "KAIROS ISSUED: " << kairos->pf_issued_kairos << std::endl;

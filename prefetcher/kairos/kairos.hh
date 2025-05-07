@@ -9,6 +9,7 @@
 #include <deque>
 #include <optional>
 #include <cstdint>
+#include <unordered_set>
 
 #include "kairos_parameters.h"
 #include "cache.h"
@@ -47,14 +48,14 @@ private:
 
   std::vector<uint64_t> rrTable;
 
-  PrefetchTable prefetch_table;
-
   /** Structure to save the offset and the score */
   typedef std::pair<int16_t, uint8_t> OffsetListEntry;
   std::vector<OffsetListEntry> offsetsList;
 
   std::array<uint64_t, NUM_OFFSETS> learned_offsets = {1};
   unsigned int current_learning_offset_idx = 0;
+
+  std::unordered_set<uint64_t> suppressed_offsets;
 
   /** Current best offset found in the learning phase */
   uint64_t phaseBestOffset;
@@ -90,13 +91,20 @@ private:
    *  @param addr_tag: tag searched for within the RR
    */
   bool testRR(uint64_t addr_tag) const;
-
 public:
   /** Total number of pf issued */
   unsigned int pf_issued_kairos = 0;
 
   /** Total number of useful pf */
   unsigned int pf_useful_kairos = 0;
+
+  PrefetchTable prefetch_table;
+
+  std::unordered_map<uint64_t, uint64_t> offset_issued;
+  std::unordered_map<uint64_t, uint64_t> offset_useful;
+  std::unordered_map<uint64_t, std::vector<double>> offset_accuracy_log;
+
+  void recordAccuracy();
 
   /** Learning phase of the BOP. Update the intermediate values of the
    * round and update the best offset if found
@@ -107,7 +115,7 @@ public:
 
   uint64_t calculatePrefetchAddr(uint64_t addr);
 
-  std::vector<uint64_t> calculatePrefetchAddrs(uint64_t addr);
+  std::vector<std::pair<uint64_t, uint64_t>> calculatePrefetchAddrs(uint64_t addr);
 
   void insertFill(uint64_t addr);
 
