@@ -134,10 +134,10 @@ void KAIROS::bestOffsetLearning(uint64_t addr)
 
     uint64_t prev_pf_addr = addr - (off << LOG2_BLOCK_SIZE);
     if (testRR(tag(prev_pf_addr))) {
+      // if constexpr (champsim::test_dbug) {
+      //   std::cout << "Load covered by offset" << std::endl;
+      // }
       return; // Already covered by another learned offset
-      if constexpr (champsim::test_dbug) {
-        std::cout << "Load covered by offset" << std::endl;
-      }
     }
   }
 
@@ -214,7 +214,7 @@ std::vector<std::pair<uint64_t, uint64_t>> KAIROS::calculatePrefetchAddrs(uint64
     } 
 
     PrefetchTable::Entry entry{pf_addr, offset};
-    prefetch_table.insert(entry);
+    prefetch_table.insert(entry);   // Move this insertion so only occurs if prefetch issued, although this could decrease usage stats
 
     pf_addrs.emplace_back(pf_addr, offset);
 
@@ -372,9 +372,14 @@ uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cac
 // set and way of allocated entry
 uint32_t CACHE::prefetcher_cache_fill(uint64_t addr, uint32_t set, uint32_t way, uint8_t prefetch, uint64_t evicted_addr, uint32_t metadata_in)
 {
+  /*
+    I need to fix how this only occurs if prefetch, it means when all suppressed nothing is inserted into RR.
+    It currently works because of roundmax in the training process, so we eventually get a new offset
+  */
+
   // Only insert into the RR Table if fill is a hardware prefetch
   if (prefetch){
-    kairos->insertFill(addr);
+    kairos->insertFill(addr);  
   }
 
   return metadata_in;

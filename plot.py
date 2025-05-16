@@ -8,8 +8,8 @@ plt.style.use(["science", "light", "no-latex"])
 
 # --- CONFIGURABLE ---
 LOG_DIR = 'results'
-BENCHMARKS = ['cactusADM436', 'xalancbmk623']
-PREFETCHERS = ['no', 'bop_stride_metadata', 'berti']
+BENCHMARKS = ['bwaves603', 'cactusADM436', 'xalancbmk623']
+PREFETCHERS = ['no', 'bop', 'berti', 'bop_multi']
 SIMPOINTS = []  # Will be auto-filled with (benchmark/simpoint)
 
 # --- FUNCTION TO PARSE IPC ---
@@ -80,6 +80,7 @@ ax.axhline(1.0, linestyle='--', color='black', linewidth=1, label='baseline')
 
 ax.set_xticks([xi + bar_width * (len(plot_prefetchers) - 1) / 2 for xi in x])
 ax.set_xticklabels(simpoint_labels, rotation=45, ha='right')
+ax.set_ylim(bottom=0.5) 
 ax.set_ylabel("Speedup")
 ax.set_xlabel("Simpoint")
 # ax.set_title("Prefetcher Speedup Across Benchmarks")

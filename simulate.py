@@ -101,7 +101,11 @@ def champsim_kernel(kernel_arg):
 
     (benchmark, job_number, total) = kernel_arg
 
-    with open(f"results/{prefetcher}/{args.benchmark}/{benchmark.split('.')[1]}.txt", "w+") as output_file:
+    benchmark_split = benchmark.split('.')
+    benchmark_num = benchmark_split[0]
+    benchmark_name = benchmark_split[1]
+
+    with open(f"results/{prefetcher}/{args.benchmark}/{benchmark_num}.{benchmark_name}.txt", "w+") as output_file:
         print(f"Dispatching {benchmark} ... [{job_number+1} / {total+1}]")
         result = subprocess.run([
             "./bin/champsim", 
