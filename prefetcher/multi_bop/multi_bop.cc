@@ -134,7 +134,7 @@ void MULTI_BOP::bestOffsetLearning(uint64_t addr)
 
     uint64_t prev_pf_addr = addr - (off << LOG2_BLOCK_SIZE);
     if (testRR(tag(prev_pf_addr))) {
-      // if constexpr (champsim::test_dbug) {
+      // if constexpr (champsim::multi_bop_dbug) {
       //   std::cout << "Load covered by offset" << std::endl;
       // }
       return; // Already covered by another learned offset
@@ -172,7 +172,7 @@ void MULTI_BOP::bestOffsetLearning(uint64_t addr)
   // Learning phase end
   if ((bestScore >= scoreMax) || (round >= roundMax)) {
     learned_offsets[current_learning_offset_idx] = phaseBestOffset;
-    if constexpr (champsim::test_dbug) {
+    if constexpr (champsim::multi_bop_dbug) {
       std::cout << "Learned new offset #" << current_learning_offset_idx << ": " << phaseBestOffset << std::endl;
     }
 
@@ -292,7 +292,7 @@ void MULTI_BOP::recordAccuracy() {
       suppressed_offsets.insert(offset);
     }
 
-    if constexpr (champsim::test_dbug) {
+    if constexpr (champsim::multi_bop_dbug) {
       std::cout << "[Accuracy] Offset: " << offset
                 << ", Issued: " << issued
                 << ", Useful: " << useful
