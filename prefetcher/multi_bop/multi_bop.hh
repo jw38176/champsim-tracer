@@ -1,5 +1,5 @@
-#ifndef __MEM_CACHE_PREFETCH_KAIROS_HH__
-#define __MEM_CACHE_PREFETCH_KAIROS_HH__
+#ifndef __MEM_CACHE_PREFETCH_MULTI_BOP_HH__
+#define __MEM_CACHE_PREFETCH_MULTI_BOP_HH__
 
 #include <algorithm>
 #include <iostream>
@@ -11,12 +11,12 @@
 #include <cstdint>
 #include <unordered_set>
 
-#include "kairos_parameters.h"
+#include "multi_bop_parameters.h"
 #include "cache.h"
 #include "msl/bits.h"
 #include "msl/lru_table.h"
 
-namespace kairos_space
+namespace multi_bop_space
 { 
 class PrefetchTable {
 public:
@@ -36,7 +36,7 @@ private:
   std::size_t max_size;
 };
 
-class KAIROS
+class MULTI_BOP
 {
 private:
   /** Learning phase parameters */
@@ -93,10 +93,10 @@ private:
   bool testRR(uint64_t addr_tag) const;
 public:
   /** Total number of pf issued */
-  unsigned int pf_issued_kairos = 0;
+  unsigned int pf_issued_multi_bop = 0;
 
   /** Total number of useful pf */
-  unsigned int pf_useful_kairos = 0;
+  unsigned int pf_useful_multi_bop = 0;
 
   PrefetchTable prefetch_table;
 
@@ -119,12 +119,12 @@ public:
 
   void insertFill(uint64_t addr);
 
-  KAIROS();
-  ~KAIROS() = default;
-}; // class KAIROS
+  MULTI_BOP();
+  ~MULTI_BOP() = default;
+}; // class MULTI_BOP
 
-KAIROS* kairos;
+MULTI_BOP* multi_bop;
 
-} // namespace kairos_space
+} // namespace multi_bop_space
 
-#endif /* __MEM_CACHE_PREFETCH_KAIROS_HH__ */
+#endif /* __MEM_CACHE_PREFETCH_MULTI_BOP_HH__ */

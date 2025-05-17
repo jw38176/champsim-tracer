@@ -39,10 +39,16 @@ constexpr bool bop_debug = true;
 constexpr bool bop_debug = false;
 #endif
 
-#ifdef KAIROS_DBUG
-constexpr bool kairos_dbug = true;
+#ifdef MULTI_BOP_DBUG
+constexpr bool multi_bop_dbug = true;
 #else
-constexpr bool kairos_dbug = false;
+constexpr bool multi_bop_dbug = false;
+#endif
+
+#ifdef KAIRIOS_DBUG
+constexpr bool kairios_dbug = true;
+#else
+constexpr bool kairios_dbug = false;
 #endif
 
 #ifdef TEST_DBUG

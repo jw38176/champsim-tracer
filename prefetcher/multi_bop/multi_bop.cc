@@ -1,8 +1,8 @@
-#include "kairos.hh"
+#include "multi_bop.hh"
 
 #include <algorithm>
 
-using namespace kairos_space;
+using namespace multi_bop_space;
 
 PrefetchTable::PrefetchTable(std::size_t table_max_size)
   : max_size(table_max_size) {}
@@ -33,7 +33,7 @@ void PrefetchTable::remove(uint64_t addr) {
   }
 }
 
-KAIROS::KAIROS()
+MULTI_BOP::MULTI_BOP()
     : scoreMax(SCORE_MAX), roundMax(ROUND_MAX), rrEntries(RR_SIZE), tagMask((1 << TAG_BITS) - 1),
       prefetch_table(PREFETCH_TABLE_SIZE), phaseBestOffset(0), bestScore(0), round(0)
 {
@@ -72,7 +72,7 @@ KAIROS::KAIROS()
   }
 
   offsetsListIterator = offsetsList.begin();
-  if constexpr (champsim::kairos_dbug) {
+  if constexpr (champsim::multi_bop_dbug) {
     std::cout << "Offsets List:\n";
     for (const auto& entry : offsetsList) {
         std::cout << "Offset: " << entry.first << ", Metadata: " << static_cast<int>(entry.second) << '\n';
@@ -80,7 +80,7 @@ KAIROS::KAIROS()
   }
 }
 
-unsigned int KAIROS::index(uint64_t addr) const
+unsigned int MULTI_BOP::index(uint64_t addr) const
 {
   /*
    * For indexing the RR Table, the cache line
@@ -94,21 +94,21 @@ unsigned int KAIROS::index(uint64_t addr) const
   return hash % rrEntries;
 }
 
-void KAIROS::insertIntoRR(uint64_t addr, uint64_t tag)
+void MULTI_BOP::insertIntoRR(uint64_t addr, uint64_t tag)
 {
   rrTable[index(addr)] = tag;
 }
 
-void KAIROS::resetScores()
+void MULTI_BOP::resetScores()
 {
   for (auto& it : offsetsList) {
     it.second = 0;
   }
 }
 
-inline uint64_t KAIROS::tag(uint64_t addr) const { return (addr >> LOG2_BLOCK_SIZE) & tagMask; }
+inline uint64_t MULTI_BOP::tag(uint64_t addr) const { return (addr >> LOG2_BLOCK_SIZE) & tagMask; }
 
-bool KAIROS::testRR(uint64_t addr_tag) const
+bool MULTI_BOP::testRR(uint64_t addr_tag) const
 {
   for (auto& it : rrTable) {
     if (it == addr_tag) {
@@ -119,7 +119,7 @@ bool KAIROS::testRR(uint64_t addr_tag) const
   return false;
 }
 
-void KAIROS::bestOffsetLearning(uint64_t addr)
+void MULTI_BOP::bestOffsetLearning(uint64_t addr)
 {
   /*
    * This can be changed to store offset in cache/shadowcache and checking this way
@@ -148,7 +148,7 @@ void KAIROS::bestOffsetLearning(uint64_t addr)
 
   // Score offset if demand addr was prefetched
   if (testRR(lookup_tag)) {
-    if constexpr (champsim::kairos_dbug) {
+    if constexpr (champsim::multi_bop_dbug) {
       std::cout << "Address " << lookup_tag << " found in RR table" << std::endl;
     }
     (*offsetsListIterator).second++;
@@ -156,7 +156,7 @@ void KAIROS::bestOffsetLearning(uint64_t addr)
     if ((*offsetsListIterator).second > bestScore) {
       bestScore = (*offsetsListIterator).second;
       phaseBestOffset = offset;
-      if constexpr (champsim::kairos_dbug) {
+      if constexpr (champsim::multi_bop_dbug) {
         std::cout << "New best score is " << bestScore << " for offset " << offset << std::endl;
       }
     }
@@ -195,7 +195,7 @@ void KAIROS::bestOffsetLearning(uint64_t addr)
   }
 }
 
-std::vector<std::pair<uint64_t, uint64_t>> KAIROS::calculatePrefetchAddrs(uint64_t addr)
+std::vector<std::pair<uint64_t, uint64_t>> MULTI_BOP::calculatePrefetchAddrs(uint64_t addr)
 {
   std::vector<std::pair<uint64_t, uint64_t>> pf_addrs;
 
@@ -206,7 +206,7 @@ std::vector<std::pair<uint64_t, uint64_t>> KAIROS::calculatePrefetchAddrs(uint64
 
     if ((addr >> LOG2_PAGE_SIZE) != (pf_addr >> LOG2_PAGE_SIZE))
     {
-      if constexpr (champsim::kairos_dbug) 
+      if constexpr (champsim::multi_bop_dbug) 
       {
         std::cout << "Prefetch not issued - Page crossed" << std::endl;
       }
@@ -218,7 +218,7 @@ std::vector<std::pair<uint64_t, uint64_t>> KAIROS::calculatePrefetchAddrs(uint64
 
     pf_addrs.emplace_back(pf_addr, offset);
 
-    if constexpr (champsim::kairos_dbug) {
+    if constexpr (champsim::multi_bop_dbug) {
       std::cout << "Generated prefetch: " << pf_addr << " with offset " << offset << std::endl;
     }
   }
@@ -226,7 +226,7 @@ std::vector<std::pair<uint64_t, uint64_t>> KAIROS::calculatePrefetchAddrs(uint64
   return pf_addrs;
 }
 
-void KAIROS::insertFill(uint64_t addr)
+void MULTI_BOP::insertFill(uint64_t addr)
 {
   auto result = prefetch_table.lookup(addr);
   bool all_suppressed = true;
@@ -247,7 +247,7 @@ void KAIROS::insertFill(uint64_t addr)
 
     if ((base_address >> LOG2_PAGE_SIZE) != (addr >> LOG2_PAGE_SIZE))
     {
-      if constexpr (champsim::kairos_dbug) 
+      if constexpr (champsim::multi_bop_dbug) 
       {
         std::cout << "Filled address crossed page" << std::endl;
       }
@@ -257,7 +257,7 @@ void KAIROS::insertFill(uint64_t addr)
     uint64_t tag_y = tag(base_address);
 
     insertIntoRR(addr, tag_y);
-    if constexpr (champsim::kairos_dbug) 
+    if constexpr (champsim::multi_bop_dbug) 
     {
       std::cout << "Filled RR" << std::endl;
     }
@@ -267,19 +267,19 @@ void KAIROS::insertFill(uint64_t addr)
     uint64_t tag_y = tag(addr);
     insertIntoRR(addr, tag_y);
 
-    if constexpr (champsim::kairos_dbug) {
+    if constexpr (champsim::multi_bop_dbug) {
       std::cout << "Filled RR fallback due to all offsets suppressed" << std::endl;
     }
   }
   else {
-    if constexpr (champsim::kairos_dbug) 
+    if constexpr (champsim::multi_bop_dbug) 
     {
       std::cout << "Filled addr not found in recent prefetches" << std::endl;
     }
   }
 }
 
-void KAIROS::recordAccuracy() {
+void MULTI_BOP::recordAccuracy() {
   for (const uint64_t offset: learned_offsets) {
     if (offset == 0) continue; // skip unused
 
@@ -305,8 +305,8 @@ void KAIROS::recordAccuracy() {
 
 void CACHE::prefetcher_initialize() 
 { 
-  kairos = new KAIROS();
-  std::cout << "KAIROS Prefetcher Initialise" << std::endl; 
+  multi_bop = new MULTI_BOP();
+  std::cout << "MULTI_BOP Prefetcher Initialise" << std::endl; 
 }
 
 // addr: address of cache block
@@ -321,11 +321,11 @@ uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cac
   if ((cache_hit && useful_prefetch) || !cache_hit) {
     // increment useful prefetch counter, not quite the same as cache stat since we don't remove the prefetch tag 
     if(cache_hit && useful_prefetch) { 
-      kairos->pf_useful_kairos++; 
+      multi_bop->pf_useful_multi_bop++; 
 
-      auto result = kairos->prefetch_table.lookup(addr);
+      auto result = multi_bop->prefetch_table.lookup(addr);
       if (result.has_value()) {
-        kairos->offset_useful[result->offset]++;
+        multi_bop->offset_useful[result->offset]++;
       }
     }
 
@@ -341,22 +341,22 @@ uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cac
         if (mshr_entry->type == access_type::PREFETCH && type != champsim::to_underlying(access_type::PREFETCH)) { // Redundant check for prefetch type but left for clarity
           // Mark the prefetch as useful
           if (mshr_entry->prefetch_from_this)
-            kairos->pf_useful_kairos++;
+            multi_bop->pf_useful_multi_bop++;
         }
       }
     }
 
-    kairos->bestOffsetLearning(addr);
+    multi_bop->bestOffsetLearning(addr);
 
-    auto pf_addrs = kairos->calculatePrefetchAddrs(addr);
+    auto pf_addrs = multi_bop->calculatePrefetchAddrs(addr);
     
     for (auto [pf_addr, offset] : pf_addrs) {
       bool issued = prefetch_line(pf_addr, true, metadata_in);
       if (issued) {
-        ++(kairos->pf_issued_kairos);
-        kairos->offset_issued[offset]++;
+        ++(multi_bop->pf_issued_multi_bop);
+        multi_bop->offset_issued[offset]++;
       } else {
-        if constexpr (champsim::kairos_dbug) {
+        if constexpr (champsim::multi_bop_dbug) {
           std::vector<std::size_t> pq_occupancy = get_pq_occupancy();
           std::cout << "PQ FULL, pq_occupany: " << pq_occupancy[2] << std::endl;
         }
@@ -379,7 +379,7 @@ uint32_t CACHE::prefetcher_cache_fill(uint64_t addr, uint32_t set, uint32_t way,
 
   // Only insert into the RR Table if fill is a hardware prefetch
   if (prefetch){
-    kairos->insertFill(addr);  
+    multi_bop->insertFill(addr);  
   }
 
   return metadata_in;
@@ -389,11 +389,11 @@ void CACHE::prefetcher_cycle_operate() {
   static uint64_t cycle_counter = 0;
   cycle_counter++;
   if (cycle_counter % 100000 == 0) {
-      kairos->recordAccuracy();
+      multi_bop->recordAccuracy();
   }
 }
 
 void CACHE::prefetcher_final_stats() {
-  std::cout << "KAIROS ISSUED: " << kairos->pf_issued_kairos << std::endl;
-  std::cout << "KAIROS USEFUL: " << kairos->pf_useful_kairos << std::endl;
+  std::cout << "MULTI_BOP ISSUED: " << multi_bop->pf_issued_multi_bop << std::endl;
+  std::cout << "MULTI_BOP USEFUL: " << multi_bop->pf_useful_multi_bop << std::endl;
 }
