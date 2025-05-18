@@ -370,7 +370,7 @@ uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cac
         } else {
           if constexpr (champsim::kairios_dbug) {
             std::vector<std::size_t> pq_occupancy = get_pq_occupancy();
-            std::cout << "PQ FULL, pq_occupany: " << pq_occupancy[2] << std::endl;
+            std::cout << "PQ FULL, pq_occupany: " << pq_occupancy[2] << std::endl; // hard-coded for L2 occupancy
           }
         }
       }

@@ -83,9 +83,8 @@ void BOP::resetScores()
 }
 
 inline uint64_t BOP::tag(uint64_t addr) const {
-  uint64_t log_rr_entries = champsim::lg2(rrEntries);
   uint64_t line_addr = addr >> LOG2_BLOCK_SIZE;
-  return (line_addr >> log_rr_entries) & tagMask; 
+  return line_addr & tagMask; 
 }
 
 bool BOP::testRR(uint64_t addr_tag) const
