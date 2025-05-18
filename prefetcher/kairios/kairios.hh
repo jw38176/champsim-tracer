@@ -137,7 +137,7 @@ public:
    * @param addr: full address used to compute X-O tag to determine
    *              offset efficacy.
    */
-  void bestOffsetLearning(uint64_t addr);
+  void bestOffsetLearning(uint64_t addr, uint8_t cache_hit);
 
   std::vector<uint64_t> calculateAccuratePrefetchAddrs(uint64_t addr, uint64_t pc);
 

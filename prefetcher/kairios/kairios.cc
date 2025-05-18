@@ -174,20 +174,12 @@ void KAIRIOS::resetScores()
   }
 }
 
-void KAIRIOS::bestOffsetLearning(uint64_t addr)
+void KAIRIOS::bestOffsetLearning(uint64_t addr, uint8_t cache_hit)
 {
-  // Skip learning if any of the already-learned offsets covered this addr
-  for (std::size_t i = 0; i < learned_offsets.size(); ++i) {
-    if (i == current_learning_offset_idx)
-      continue; // skip the offset we're learning
-
-    uint64_t off = learned_offsets[i];
-    if (off == 0)
-      continue; // unused slot
-
-    uint64_t prev_pf_addr = addr - (off << LOG2_BLOCK_SIZE);
-    if (rr_table.test(prev_pf_addr)) {
-      return; // Already covered by another learned offset
+  if (cache_hit) {
+    // only train if X was prefetched by the offset being retrained
+    if (!rr_table.test(addr - (learned_offsets[current_learning_offset_idx] << LOG2_BLOCK_SIZE))) {
+      return;
     }
   }
 
@@ -382,11 +374,7 @@ uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cac
       kairios->holding_table.insert(addr, addr, ip);
     }
 
-    // if (X is a cache miss or (HoldTable.contains(X - RetrainingOffset) && Accuracy[HoldTable[X - RetrainingOffset].PC, RetrainingOffsetIndex] > threshold))
-    //   // X was prefetched by the retrained index, or X a miss
-    //   Train_Offsets(X)
-
-    kairios->bestOffsetLearning(addr);
+    kairios->bestOffsetLearning(addr, cache_hit);
   }
 
   return metadata_in;
