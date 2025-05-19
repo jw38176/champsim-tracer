@@ -119,7 +119,7 @@ void AccuracyTable::resetOffsetStats(int offset_idx)
 
 KAIRIOS::KAIRIOS()
     : scoreMax(SCORE_MAX), roundMax(ROUND_MAX), phaseBestOffset(0), bestScore(0), round(0), rr_table(RR_SIZE), holding_table(HOLDING_TABLE_SIZE),
-      accuracy_table(ACCURACY_TABLE_SIZE)
+      accuracy_table(ACCURACY_TABLE_SIZE), eviction_table(EVICTION_TABLE_SIZE)
 
 {
   if (!champsim::msl::isPowerOf2(RR_SIZE)) {
@@ -298,7 +298,7 @@ void KAIRIOS::accuracy_train(uint64_t addr, uint64_t pc)
     if (i >= static_cast<int>(pf_addrs.size()))
       break; // for safety
 
-    if (rr_table.test(pf_addrs[i])) {
+    if (rr_table.test(pf_addrs[i]) || eviction_table.test(pf_addrs[i])) {
       accuracy_table.increment(pc, i);
       if constexpr (champsim::kairios_dbug) {
         std::cout << "INCREMENT" << std::endl;
@@ -310,6 +310,8 @@ void KAIRIOS::accuracy_train(uint64_t addr, uint64_t pc)
       accuracy_table.decrement(pc, i);
     }
   }
+
+  eviction_table.insert(addr);
 }
 
 void KAIRIOS::insertFill(uint64_t addr)
