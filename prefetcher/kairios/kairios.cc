@@ -104,18 +104,28 @@ void AccuracyTable::resetOffsetStats(int offset_idx)
   }
 }
 
-// void AccuracyTable::calculateAllAccuracies() {
-//   for (std::size_t i = 0; i < table_size; ++i) {
-//     for (std::size_t j = 0; j < NUM_OFFSETS; ++j) {
-//       PfCounters& counters = table[i][j];
-//       if (counters.issued > 0) {
-//         counters.accuracy = static_cast<float>(counters.useful) / counters.issued;
-//       } else {
-//         counters.accuracy = 0.0f;
-//       }
-//     }
-//   }
-// }
+EvictionTable::EvictionTable(std::size_t size)
+    : table_size(size), next_index(0)
+{
+  table.resize(table_size, 0);
+}
+
+void EvictionTable::insert(uint64_t addr)
+{
+  table[next_index] = addr;
+  next_index = (next_index + 1) % table_size;
+}
+
+bool EvictionTable::test(uint64_t addr) const
+{
+  return std::find(table.begin(), table.end(), addr) != table.end();
+}
+
+void EvictionTable::clear()
+{
+  std::fill(table.begin(), table.end(), 0);
+  next_index = 0;
+}
 
 KAIRIOS::KAIRIOS()
     : scoreMax(SCORE_MAX), roundMax(ROUND_MAX), phaseBestOffset(0), bestScore(0), round(0), rr_table(RR_SIZE), holding_table(HOLDING_TABLE_SIZE),

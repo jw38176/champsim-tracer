@@ -91,27 +91,16 @@ private:
 
 class EvictionTable {
 public:
+  explicit EvictionTable(std::size_t size);
+
+  void insert(uint64_t addr);
+  bool test(uint64_t addr) const;
+  void clear();
+
+private:
   std::vector<uint64_t> table;
-  std::size_t size;
+  std::size_t table_size;
   std::size_t next_index;
-
-  EvictionTable(std::size_t size) : size(size), next_index(0) {
-    table.resize(size, 0);
-  }
-
-  void insert(uint64_t addr) {
-    table[next_index] = addr;
-    next_index = (next_index + 1) % size;
-  }
-
-  bool test(uint64_t addr) const {
-    return std::find(table.begin(), table.end(), addr) != table.end();
-  }
-
-  void clear() {
-    std::fill(table.begin(), table.end(), 0);
-    next_index = 0;
-  }
 };
 
 
