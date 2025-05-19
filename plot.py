@@ -3,13 +3,14 @@ import matplotlib.pyplot as plt
 import scienceplots
 from collections import defaultdict
 
-# plt.style.use(["science", "light"])
-plt.style.use(["science", "light", "no-latex"])
+plt.style.use(["science", "light"])
+# plt.style.use(["science", "light", "no-latex"])
 
 # --- CONFIGURABLE ---
 LOG_DIR = 'results'
-BENCHMARKS = ['bwaves603', 'cactusADM436', 'xalancbmk623']
-PREFETCHERS = ['no', 'bop', 'berti', 'bop_multi']
+BENCHMARKS = ['cactusADM436', 'bwaves603', 'xalancbmk623']
+BASELINE = 'no'
+PREFETCHERS = ['no', 'berti', 'bop', 'kairios']
 SIMPOINTS = []  # Will be auto-filled with (benchmark/simpoint)
 
 # --- FUNCTION TO PARSE IPC ---
@@ -57,7 +58,7 @@ simpoint_labels = sorted(simpoint_labels)
 speedup_data = defaultdict(list)
 for prefetcher in PREFETCHERS:
     for label in simpoint_labels:
-        base_ipc = ipc_data['no'].get(label)
+        base_ipc = ipc_data[BASELINE].get(label)
         test_ipc = ipc_data[prefetcher].get(label)
         if base_ipc and test_ipc:
             speedup = test_ipc / base_ipc
@@ -66,7 +67,7 @@ for prefetcher in PREFETCHERS:
         speedup_data[prefetcher].append(speedup)
 
 # --- PLOTTING ---
-plot_prefetchers = [p for p in PREFETCHERS if p != 'no']
+plot_prefetchers = [p for p in PREFETCHERS if p != BASELINE]
 x = range(len(simpoint_labels))
 bar_width = 0.3 / len(plot_prefetchers)
 
@@ -96,5 +97,5 @@ ax.grid(True, linestyle='--', alpha=0.7)
 plt.tight_layout()
 if not os.path.exists(f"figures"):
     os.makedirs(f"figures")
-plt.savefig("figures/test.pdf", format='pdf', dpi=300)
+plt.savefig("figures/new_test.pdf", format='pdf', dpi=300)
 # plt.show()
