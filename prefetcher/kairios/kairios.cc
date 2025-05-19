@@ -191,6 +191,9 @@ void KAIRIOS::bestOffsetLearning(uint64_t addr, uint8_t cache_hit)
     if (!rr_table.test(addr - (learned_offsets[current_learning_offset_idx] << LOG2_BLOCK_SIZE))) {
       return;
     }
+    else if (accuracy_table.lookup(rr_table.lookup(addr - learned_offsets[current_learning_offset_idx]).pc, current_learning_offset_idx) < ACCURACY_THRESHOLD) {
+      return;
+    }
   }
 
   uint64_t offset = (*offsetsListIterator).first;
@@ -267,7 +270,7 @@ std::vector<uint64_t> KAIRIOS::calculateAccuratePrefetchAddrs(uint64_t addr, uin
     pf_addrs.push_back(pf_addr);
 
     if constexpr (champsim::kairios_dbug) {
-      std::cout << "Generated prefetch: " << pf_addr << " with offset " << offset << std::endl;
+      std::cout << "Generated accurate prefetch: " << pf_addr << " with offset " << offset << std::endl;
     }
   }
 
