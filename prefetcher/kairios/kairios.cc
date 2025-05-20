@@ -30,7 +30,8 @@ RRTable::Entry RRTable::lookup(uint64_t addr) const
 bool RRTable::test(uint64_t addr) const
 {
   auto idx = index(addr);
-  return table[idx].addr == addr;
+  return (table[idx].addr >> LOG2_BLOCK_SIZE) == (addr >> LOG2_BLOCK_SIZE);
+  // return table[idx].addr == addr;
 }
 
 HoldingTable::HoldingTable(std::size_t size) : log_size(champsim::lg2(size)) { entries.resize(size); }
@@ -112,13 +113,15 @@ EvictionTable::EvictionTable(std::size_t size)
 
 void EvictionTable::insert(uint64_t addr)
 {
-  table[next_index] = addr;
+  uint64_t line_addr = addr >> LOG2_BLOCK_SIZE;
+  table[next_index] = line_addr;
   next_index = (next_index + 1) % table_size;
 }
 
 bool EvictionTable::test(uint64_t addr) const
 {
-  return std::find(table.begin(), table.end(), addr) != table.end();
+  uint64_t line_addr = addr >> LOG2_BLOCK_SIZE;
+  return std::find(table.begin(), table.end(), line_addr) != table.end(); // UPDATE THIS TO LINE ADDR?
 }
 
 void EvictionTable::clear()
@@ -191,7 +194,7 @@ void KAIRIOS::bestOffsetLearning(uint64_t addr, uint8_t cache_hit)
     if (!rr_table.test(addr - (learned_offsets[current_learning_offset_idx] << LOG2_BLOCK_SIZE))) {
       return;
     }
-    else if (accuracy_table.lookup(rr_table.lookup(addr - learned_offsets[current_learning_offset_idx]).pc, current_learning_offset_idx) < ACCURACY_THRESHOLD) {
+    else if (accuracy_table.lookup(rr_table.lookup(addr - (learned_offsets[current_learning_offset_idx] << LOG2_BLOCK_SIZE)).pc, current_learning_offset_idx) < ACCURACY_THRESHOLD) {
       return;
     }
   }
@@ -307,10 +310,14 @@ void KAIRIOS::accuracy_train(uint64_t addr, uint64_t pc)
 
   std::vector<uint64_t> pf_addrs = calculateAllPrefetchAddrs(addr);
 
-  for (int i = 0; i < NUM_OFFSETS; ++i) {
-    if (i >= static_cast<int>(pf_addrs.size()))
-      break; // for safety
+  if constexpr (champsim::kairios_dbug) {
+        std::cout << "ALL PF ADDR SIZE" << pf_addrs.size() << std::endl;
+  }
 
+  for (int i = 0; i < NUM_OFFSETS; ++i) {
+    if (i >= static_cast<int>(pf_addrs.size())){
+      break; // for safety
+    }
     if (rr_table.test(pf_addrs[i]) || eviction_table.test(pf_addrs[i])) {
       accuracy_table.increment(pc, i);
       if constexpr (champsim::kairios_dbug) {
@@ -367,9 +374,12 @@ uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cac
 
     auto pf_addrs = kairios->calculateAccuratePrefetchAddrs(addr, ip);
 
+    if constexpr (champsim::kairios_dbug) {
+        std::cout << "ACCURATE PF ADDR SIZE" << pf_addrs.size() << std::endl;
+    }
+
     if (pf_addrs.size() > 0) {
       for (auto pf_addr : pf_addrs) {
-
         bool issued = prefetch_line(pf_addr, true, metadata_in);
         if (issued) {
           kairios->holding_table.insert(pf_addr, addr, ip); // Only if issued

@@ -83,7 +83,6 @@ private:
 
   int getIndex(uint64_t pc) const;
 
-  // Add these inside the class:
   static constexpr int16_t ACC_MIN = -16;
   static constexpr int16_t ACC_MAX = 15;
 };
