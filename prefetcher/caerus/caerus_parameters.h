@@ -16,7 +16,7 @@ namespace caerus_space
   # define ACCURACY_THRESHOLD   (0)   // Saturing counter value for pc/offset to be accurate
 
   constexpr std::size_t HOLDING_TABLE_SIZE = 128;  // Size of the holding table
-  constexpr std::size_t ACCURACY_TABLE_SIZE = 512; // Size of the pc accuracy table
+  constexpr std::size_t ACCURACY_TABLE_SIZE = 128; // Size of the pc accuracy table
   constexpr std::size_t EVICTION_TABLE_SIZE = 128; // Size of the RR victim table 
 };
 # endif
