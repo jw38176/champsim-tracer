@@ -1,8 +1,8 @@
-#include "kairios.hh"
+#include "caerus.hh"
 
 #include <algorithm>
 
-using namespace kairios_space;
+using namespace caerus_space;
 
 RRTable::RRTable(std::size_t size) : log_size(champsim::lg2(size)) { table.resize(size); }
 
@@ -77,7 +77,7 @@ void AccuracyTable::increment(uint64_t pc, int offset_idx)
   if (offset_idx >= 0 && offset_idx < NUM_OFFSETS) {
     if (table[idx][offset_idx] < ACC_MAX)
       table[idx][offset_idx]++;
-    if constexpr (champsim::kairios_dbug) {
+    if constexpr (champsim::caerus_dbug) {
       std::cout << "Offset score incremented to: " << table[idx][offset_idx] << std::endl;
     }
   }
@@ -89,7 +89,7 @@ void AccuracyTable::decrement(uint64_t pc, int offset_idx)
   if (offset_idx >= 0 && offset_idx < NUM_OFFSETS) {
     if (table[idx][offset_idx] > ACC_MIN)
       table[idx][offset_idx]--;
-    if constexpr (champsim::kairios_dbug) {
+    if constexpr (champsim::caerus_dbug) {
       std::cout << "Offset score decremented to: " << table[idx][offset_idx] << std::endl;
     }
   }
@@ -130,7 +130,7 @@ void EvictionTable::clear()
   next_index = 0;
 }
 
-KAIRIOS::KAIRIOS()
+CAERUS::CAERUS()
     : scoreMax(SCORE_MAX), roundMax(ROUND_MAX), phaseBestOffset(0), bestScore(0), round(0), rr_table(RR_SIZE), holding_table(HOLDING_TABLE_SIZE),
       accuracy_table(ACCURACY_TABLE_SIZE), eviction_table(EVICTION_TABLE_SIZE)
 
@@ -172,7 +172,7 @@ KAIRIOS::KAIRIOS()
   }
 
   offsetsListIterator = offsetsList.begin();
-  if constexpr (champsim::kairios_dbug) {
+  if constexpr (champsim::caerus_dbug) {
     std::cout << "Offsets List:\n";
     for (const auto& entry : offsetsList) {
       std::cout << "Offset: " << entry.first << ", Metadata: " << static_cast<int>(entry.second) << '\n';
@@ -180,14 +180,14 @@ KAIRIOS::KAIRIOS()
   }
 }
 
-void KAIRIOS::resetScores()
+void CAERUS::resetScores()
 {
   for (auto& it : offsetsList) {
     it.second = 0;
   }
 }
 
-void KAIRIOS::bestOffsetLearning(uint64_t addr, uint8_t cache_hit)
+void CAERUS::bestOffsetLearning(uint64_t addr, uint8_t cache_hit)
 {
   if (cache_hit) {
     // only train if X was prefetched by the offset being retrained
@@ -205,7 +205,7 @@ void KAIRIOS::bestOffsetLearning(uint64_t addr, uint8_t cache_hit)
 
   // Score offset if demand addr in RR
   if (rr_table.test(test_addr)) {
-    if constexpr (champsim::kairios_dbug) {
+    if constexpr (champsim::caerus_dbug) {
       std::cout << "Address " << test_addr << " found in RR table" << std::endl;
     }
     (*offsetsListIterator).second++;
@@ -213,7 +213,7 @@ void KAIRIOS::bestOffsetLearning(uint64_t addr, uint8_t cache_hit)
     if ((*offsetsListIterator).second > bestScore) {
       bestScore = (*offsetsListIterator).second;
       phaseBestOffset = offset;
-      if constexpr (champsim::kairios_dbug) {
+      if constexpr (champsim::caerus_dbug) {
         std::cout << "New best score is " << bestScore << " for offset " << offset << std::endl;
       }
     }
@@ -229,7 +229,7 @@ void KAIRIOS::bestOffsetLearning(uint64_t addr, uint8_t cache_hit)
   // Learning phase end
   if ((bestScore >= scoreMax) || (round >= roundMax)) {
     learned_offsets[current_learning_offset_idx] = phaseBestOffset;
-    if constexpr (champsim::kairios_dbug) {
+    if constexpr (champsim::caerus_dbug) {
       std::cout << "Learned new offset #" << current_learning_offset_idx << ": " << phaseBestOffset << std::endl;
     }
 
@@ -247,7 +247,7 @@ void KAIRIOS::bestOffsetLearning(uint64_t addr, uint8_t cache_hit)
   }
 }
 
-std::vector<uint64_t> KAIRIOS::calculateAccuratePrefetchAddrs(uint64_t addr, uint64_t pc)
+std::vector<uint64_t> CAERUS::calculateAccuratePrefetchAddrs(uint64_t addr, uint64_t pc)
 {
   std::vector<uint64_t> pf_addrs;
 
@@ -264,7 +264,7 @@ std::vector<uint64_t> KAIRIOS::calculateAccuratePrefetchAddrs(uint64_t addr, uin
     uint64_t pf_addr = addr + (offset << LOG2_BLOCK_SIZE);
 
     // if ((addr >> LOG2_PAGE_SIZE) != (pf_addr >> LOG2_PAGE_SIZE)) {
-    //   if constexpr (champsim::kairios_dbug) {
+    //   if constexpr (champsim::caerus_dbug) {
     //     std::cout << "Prefetch not issued - Page crossed" << std::endl;
     //   }
     //   continue;
@@ -272,7 +272,7 @@ std::vector<uint64_t> KAIRIOS::calculateAccuratePrefetchAddrs(uint64_t addr, uin
 
     pf_addrs.push_back(pf_addr);
 
-    if constexpr (champsim::kairios_dbug) {
+    if constexpr (champsim::caerus_dbug) {
       std::cout << "Generated accurate prefetch: " << pf_addr << " with offset " << offset << std::endl;
     }
   }
@@ -280,7 +280,7 @@ std::vector<uint64_t> KAIRIOS::calculateAccuratePrefetchAddrs(uint64_t addr, uin
   return pf_addrs;
 }
 
-std::vector<uint64_t> KAIRIOS::calculateAllPrefetchAddrs(uint64_t addr)
+std::vector<uint64_t> CAERUS::calculateAllPrefetchAddrs(uint64_t addr)
 {
   std::vector<uint64_t> pf_addrs;
 
@@ -291,7 +291,7 @@ std::vector<uint64_t> KAIRIOS::calculateAllPrefetchAddrs(uint64_t addr)
     uint64_t pf_addr = addr + (offset << LOG2_BLOCK_SIZE);
 
     // if ((addr >> LOG2_PAGE_SIZE) != (pf_addr >> LOG2_PAGE_SIZE)) {
-    //   if constexpr (champsim::kairios_dbug) {
+    //   if constexpr (champsim::caerus_dbug) {
     //     std::cout << "Prefetch not issued - Page crossed" << std::endl;
     //   }
     //   continue;
@@ -303,14 +303,14 @@ std::vector<uint64_t> KAIRIOS::calculateAllPrefetchAddrs(uint64_t addr)
   return pf_addrs;
 }
 
-void KAIRIOS::accuracy_train(uint64_t addr, uint64_t pc)
+void CAERUS::accuracy_train(uint64_t addr, uint64_t pc)
 {
   if (pc == 0)
     return;
 
   std::vector<uint64_t> pf_addrs = calculateAllPrefetchAddrs(addr);
 
-  if constexpr (champsim::kairios_dbug) {
+  if constexpr (champsim::caerus_dbug) {
         std::cout << "ALL PF ADDR SIZE" << pf_addrs.size() << std::endl;
   }
 
@@ -320,11 +320,11 @@ void KAIRIOS::accuracy_train(uint64_t addr, uint64_t pc)
     }
     if (rr_table.test(pf_addrs[i]) || eviction_table.test(pf_addrs[i])) {
       accuracy_table.increment(pc, i);
-      if constexpr (champsim::kairios_dbug) {
+      if constexpr (champsim::caerus_dbug) {
         std::cout << "INCREMENT" << std::endl;
       }
     } else {
-      if constexpr (champsim::kairios_dbug) {
+      if constexpr (champsim::caerus_dbug) {
         std::cout << "DECREMENT" << std::endl;
       }
       accuracy_table.decrement(pc, i);
@@ -334,11 +334,11 @@ void KAIRIOS::accuracy_train(uint64_t addr, uint64_t pc)
   eviction_table.insert(addr);
 }
 
-void KAIRIOS::insertFill(uint64_t addr)
+void CAERUS::insertFill(uint64_t addr)
 {
   auto result = holding_table.lookup(addr);
   if (result.has_value()) {
-    // if constexpr (champsim::kairios_dbug) {
+    // if constexpr (champsim::caerus_dbug) {
     //   std::cout << "FOUND HOLDING, PC: " << result->pc << "BASE ADDR" << result->base_addr << std::endl;
     // }
     RRTable::Entry evicted_entry = rr_table.lookup(result->base_addr);
@@ -348,7 +348,7 @@ void KAIRIOS::insertFill(uint64_t addr)
 }
 
 // if ((base_address >> LOG2_PAGE_SIZE) != (addr >> LOG2_PAGE_SIZE)) {
-//   if constexpr (champsim::kairios_dbug) {
+//   if constexpr (champsim::caerus_dbug) {
 //     std::cout << "Filled address crossed page" << std::endl;
 //   }
 //   return;
@@ -356,8 +356,8 @@ void KAIRIOS::insertFill(uint64_t addr)
 
 void CACHE::prefetcher_initialize()
 {
-  kairios = new KAIRIOS();
-  std::cout << "KAIRIOS Prefetcher Initialise" << std::endl;
+  caerus = new CAERUS();
+  std::cout << "CAERUS Prefetcher Initialise" << std::endl;
 }
 
 uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cache_hit, bool useful_prefetch, uint8_t type, uint32_t metadata_in)
@@ -369,12 +369,12 @@ uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cac
   if ((cache_hit && useful_prefetch) || !cache_hit) {
     // increment useful prefetch counter, not quite the same as cache stat since we don't remove the prefetch tag
     if (cache_hit && useful_prefetch) {
-      kairios->pf_useful_kairios++;
+      caerus->pf_useful_caerus++;
     }
 
-    auto pf_addrs = kairios->calculateAccuratePrefetchAddrs(addr, ip);
+    auto pf_addrs = caerus->calculateAccuratePrefetchAddrs(addr, ip);
 
-    if constexpr (champsim::kairios_dbug) {
+    if constexpr (champsim::caerus_dbug) {
         std::cout << "ACCURATE PF ADDR SIZE" << pf_addrs.size() << std::endl;
     }
 
@@ -382,24 +382,24 @@ uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cac
       for (auto pf_addr : pf_addrs) {
         bool issued = prefetch_line(pf_addr, true, metadata_in);
         if (issued) {
-          kairios->holding_table.insert(pf_addr, addr, ip); // Only if issued
-          ++(kairios->pf_issued_kairios);
+          caerus->holding_table.insert(pf_addr, addr, ip); // Only if issued
+          ++(caerus->pf_issued_caerus);
         } else {
-          if constexpr (champsim::kairios_dbug) {
+          if constexpr (champsim::caerus_dbug) {
             std::vector<std::size_t> pq_occupancy = get_pq_occupancy();
             std::cout << "PQ FULL, pq_occupany: " << pq_occupancy[2] << std::endl; // hard-coded for L2 occupancy
           }
         }
       }
     } else if (cache_hit && useful_prefetch) { // Prefetch hit where no prefetches issued
-      RRTable::Entry evicted_entry = kairios->rr_table.lookup(addr);
-      kairios->accuracy_train(evicted_entry.addr, evicted_entry.pc);
-      kairios->rr_table.insert(addr, ip);
+      RRTable::Entry evicted_entry = caerus->rr_table.lookup(addr);
+      caerus->accuracy_train(evicted_entry.addr, evicted_entry.pc);
+      caerus->rr_table.insert(addr, ip);
     } else { // X is a cache miss with no PFs generated
-      kairios->holding_table.insert(addr, addr, ip);
+      caerus->holding_table.insert(addr, addr, ip);
     }
 
-    kairios->bestOffsetLearning(addr, cache_hit);
+    caerus->bestOffsetLearning(addr, cache_hit);
   }
 
   return metadata_in;
@@ -407,7 +407,7 @@ uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cac
 
 uint32_t CACHE::prefetcher_cache_fill(uint64_t addr, uint32_t set, uint32_t way, uint8_t prefetch, uint64_t evicted_addr, uint32_t metadata_in)
 {
-  kairios->insertFill(addr);
+  caerus->insertFill(addr);
 
   return metadata_in;
 }
@@ -416,6 +416,6 @@ void CACHE::prefetcher_cycle_operate() {}
 
 void CACHE::prefetcher_final_stats()
 {
-  std::cout << "KAIRIOS ISSUED: " << kairios->pf_issued_kairios << std::endl;
-  std::cout << "KAIRIOS USEFUL: " << kairios->pf_useful_kairios << std::endl;
+  std::cout << "CAERUS ISSUED: " << caerus->pf_issued_caerus << std::endl;
+  std::cout << "CAERUS USEFUL: " << caerus->pf_useful_caerus << std::endl;
 }

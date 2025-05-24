@@ -1,5 +1,5 @@
-#ifndef __MEM_CACHE_PREFETCH_KAIRIOS_HH__
-#define __MEM_CACHE_PREFETCH_KAIRIOS_HH__
+#ifndef __MEM_CACHE_PREFETCH_CAERUS_HH__
+#define __MEM_CACHE_PREFETCH_CAERUS_HH__
 
 #include <algorithm>
 #include <cstdint>
@@ -11,12 +11,12 @@
 #include <vector>
 
 #include "cache.h"
-#include "kairios_parameters.h"
+#include "caerus_parameters.h"
 #include "msl/bits.h"
 #include "msl/lru_table.h"
 #include <unordered_set>
 
-namespace kairios_space
+namespace caerus_space
 {
 
 class RRTable
@@ -103,7 +103,7 @@ private:
 };
 
 
-class KAIRIOS
+class CAERUS
 {
 private:
   /** Learning phase parameters */
@@ -135,10 +135,10 @@ private:
   void resetScores();
 public:
   /** Total number of pf issued */
-  unsigned int pf_issued_kairios = 0;
+  unsigned int pf_issued_caerus = 0;
 
   /** Total number of useful pf */
-  unsigned int pf_useful_kairios = 0;
+  unsigned int pf_useful_caerus = 0;
 
   RRTable rr_table;
 
@@ -148,7 +148,7 @@ public:
 
   EvictionTable eviction_table;
 
-  /** Learning phase of KAIRIOS. Update the intermediate values of the
+  /** Learning phase of CAERUS. Update the intermediate values of the
    * round and update the best offset if found
    * @param addr: full address used to compute X-O tag to determine
    *              offset efficacy.
@@ -163,13 +163,13 @@ public:
 
   void accuracy_train(uint64_t addr, uint64_t pc);
 
-  KAIRIOS();
-  ~KAIRIOS() = default;
-}; // class KAIRIOS
+  CAERUS();
+  ~CAERUS() = default;
+}; // class CAERUS
 
-KAIRIOS* kairios;
+CAERUS* caerus;
 
-} // namespace kairios_space
+} // namespace caerus_space
 
-#endif /* __MEM_CACHE_PREFETCH_KAIRIOS_HH__ */
+#endif /* __MEM_CACHE_PREFETCH_CAERUS_HH__ */
 

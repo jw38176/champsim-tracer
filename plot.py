@@ -10,7 +10,7 @@ plt.style.use(["science", "light"])
 LOG_DIR = 'results'
 BENCHMARKS = ['cactusADM436', 'bwaves603', 'xalancbmk623']
 BASELINE = 'no'
-PREFETCHERS = ['no', 'berti', 'bop', 'kairios']
+PREFETCHERS = ['no', 'berti', 'bop', 'caerus']
 SIMPOINTS = []  # Will be auto-filled with (benchmark/simpoint)
 
 # --- FUNCTION TO PARSE IPC ---

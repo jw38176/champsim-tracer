@@ -45,10 +45,10 @@ constexpr bool multi_bop_dbug = true;
 constexpr bool multi_bop_dbug = false;
 #endif
 
-#ifdef KAIRIOS_DBUG
-constexpr bool kairios_dbug = true;
+#ifdef CAERUS_DBUG
+constexpr bool caerus_dbug = true;
 #else
-constexpr bool kairios_dbug = false;
+constexpr bool caerus_dbug = false;
 #endif
 
 #ifdef TEST_DBUG

@@ -13,7 +13,7 @@ from _SPEC_WEIGHTS import SPEC2017_SHORTCODE_WEIGHTS
 LOG_DIR = 'results'
 BENCHMARKS = ['soplex450', 'bwaves603', 'xalancbmk623',"omnetpp471", "omnetpp620" ,"mcf429", "mcf605", "gcc602"]
 BASELINE = 'bop'
-PREFETCHERS = ['berti', 'bop', 'kairios']
+PREFETCHERS = ['berti', 'bop', 'caerus']
 
 # --- PARSE IPC ---
 def parse_ipc_from_file(filepath):

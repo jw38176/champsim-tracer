@@ -1,12 +1,12 @@
-# ifndef _KAIRIOS_PARAMETERS_H_
-# define _KAIRIOS_PARAMETERS_H_
+# ifndef _CAERUS_PARAMETERS_H_
+# define _CAERUS_PARAMETERS_H_
 
-namespace kairios_space
+namespace caerus_space
 { 
   /*****************************************************************************
    *                              PARAMS                                       *
    *****************************************************************************/
-  // KAIRIOS
+  // CAERUS
   # define SCORE_MAX            (31)  // Max. score to update the best offset
   # define ROUND_MAX            (100) // Max. round to update the best offset
   # define RR_SIZE              (256) // Number of entries in RR Table
