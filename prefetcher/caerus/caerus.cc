@@ -31,7 +31,6 @@ bool RRTable::test(uint64_t addr) const
 {
   auto idx = index(addr);
   return (table[idx].addr >> LOG2_BLOCK_SIZE) == (addr >> LOG2_BLOCK_SIZE);
-  // return table[idx].addr == addr;
 }
 
 HoldingTable::HoldingTable(std::size_t size) : log_size(champsim::lg2(size)) { entries.resize(size); }
@@ -46,7 +45,7 @@ std::optional<HoldingTable::Entry> HoldingTable::lookup(uint64_t addr) const
 {
   auto idx = index(addr);
   const Entry& e = entries[idx];
-  if (e.base_addr != 0) // Replace with a better validity condition if needed
+  if (e.base_addr != 0) 
     return e;
   return std::nullopt;
 }
@@ -68,7 +67,7 @@ int16_t AccuracyTable::lookup(uint64_t pc, int offset_idx) const
   if (offset_idx >= 0 && offset_idx < NUM_OFFSETS) {
     return table[idx][offset_idx];
   }
-  return 0; // or throw/assert if invalid offset is considered a bug
+  return 0; 
 }
 
 void AccuracyTable::increment(uint64_t pc, int offset_idx)
@@ -121,7 +120,7 @@ void EvictionTable::insert(uint64_t addr)
 bool EvictionTable::test(uint64_t addr) const
 {
   uint64_t line_addr = addr >> LOG2_BLOCK_SIZE;
-  return std::find(table.begin(), table.end(), line_addr) != table.end(); // UPDATE THIS TO LINE ADDR?
+  return std::find(table.begin(), table.end(), line_addr) != table.end(); 
 }
 
 void EvictionTable::clear()
@@ -338,9 +337,6 @@ void CAERUS::insertFill(uint64_t addr)
 {
   auto result = holding_table.lookup(addr);
   if (result.has_value()) {
-    // if constexpr (champsim::caerus_dbug) {
-    //   std::cout << "FOUND HOLDING, PC: " << result->pc << "BASE ADDR" << result->base_addr << std::endl;
-    // }
     RRTable::Entry evicted_entry = rr_table.lookup(result->base_addr);
     accuracy_train(evicted_entry.addr, evicted_entry.pc);
     rr_table.insert(result->base_addr, result->pc);
