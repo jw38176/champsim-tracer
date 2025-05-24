@@ -22,7 +22,11 @@ vcpkg_installed/
 
 .vscode
 
+get_weights.py
+
 SPEC_quick
+weights-and-simpoints-speccpu/
 log
 figures
 results
+results_artifact/

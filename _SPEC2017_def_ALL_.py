@@ -43,10 +43,11 @@ SPEC2017_SHORTCODE = {
         "433.milc-274B.champsimtrace.xz",
         "433.milc-337B.champsimtrace.xz"
     ],
-    "zeusmp434": 
-    [
-        "434.zeusmp-10B.champsimtrace.xz"
-    ],
+    # No weights available for zeus so commented out
+    # "zeusmp434":  
+    # [
+    #     "434.zeusmp-10B.champsimtrace.xz"
+    # ],
     "gromacs435": 
     [
         "435.gromacs-111B.champsimtrace.xz",
