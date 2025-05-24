@@ -17,7 +17,8 @@ std::size_t RRTable::index(uint64_t addr) const
 void RRTable::insert(uint64_t addr, uint64_t pc)
 {
   std::size_t idx = index(addr);
-  table[idx] = {addr, pc};
+  uint64_t line_addr = addr >> LOG2_BLOCK_SIZE;
+  table[idx] = {line_addr, pc};
 }
 
 RRTable::Entry RRTable::lookup(uint64_t addr) const
@@ -30,7 +31,7 @@ RRTable::Entry RRTable::lookup(uint64_t addr) const
 bool RRTable::test(uint64_t addr) const
 {
   auto idx = index(addr);
-  return (table[idx].addr >> LOG2_BLOCK_SIZE) == (addr >> LOG2_BLOCK_SIZE);
+  return (table[idx].line_addr) == (addr >> LOG2_BLOCK_SIZE);
 }
 
 HoldingTable::HoldingTable(std::size_t size) : log_size(champsim::lg2(size)) { entries.resize(size); }
@@ -105,28 +106,29 @@ void AccuracyTable::resetOffsetStats(int offset_idx)
 }
 
 EvictionTable::EvictionTable(std::size_t size)
-    : table_size(size), next_index(0)
+    : log_size(champsim::lg2(size))
 {
-  table.resize(table_size, 0);
+  table.resize(size);
 }
 
-void EvictionTable::insert(uint64_t addr)
+std::size_t EvictionTable::index(uint64_t line_addr) const
 {
-  uint64_t line_addr = addr >> LOG2_BLOCK_SIZE;
-  table[next_index] = line_addr;
-  next_index = (next_index + 1) % table_size;
+  uint64_t hash = line_addr ^ (line_addr >> log_size);
+  hash &= ((1ULL << log_size) - 1);
+  return hash;
+}
+
+void EvictionTable::insert(uint64_t line_addr)
+{ 
+  std::size_t idx = index(line_addr);
+  table[idx] = line_addr;
 }
 
 bool EvictionTable::test(uint64_t addr) const
 {
   uint64_t line_addr = addr >> LOG2_BLOCK_SIZE;
-  return std::find(table.begin(), table.end(), line_addr) != table.end(); 
-}
-
-void EvictionTable::clear()
-{
-  std::fill(table.begin(), table.end(), 0);
-  next_index = 0;
+  auto idx = index(line_addr);
+  return table[idx] == line_addr;
 }
 
 CAERUS::CAERUS()
@@ -189,12 +191,17 @@ void CAERUS::resetScores()
 void CAERUS::bestOffsetLearning(uint64_t addr, uint8_t cache_hit)
 {
   if (cache_hit) {
-    // only train if X was prefetched by the offset being retrained
-    if (!rr_table.test(addr - (learned_offsets[current_learning_offset_idx] << LOG2_BLOCK_SIZE))) {
-      return;
-    }
-    else if (accuracy_table.lookup(rr_table.lookup(addr - (learned_offsets[current_learning_offset_idx] << LOG2_BLOCK_SIZE)).pc, current_learning_offset_idx) < ACCURACY_THRESHOLD) {
-      return;
+    // Skip learning if any of the already-learned offsets covered this addr
+    for (std::size_t i = 0; i < learned_offsets.size(); ++i) {
+      if (i == current_learning_offset_idx) continue; // skip the offset we're learning
+
+      uint64_t off = learned_offsets[i];
+      if (off == 0) continue; // unused slot
+
+      uint64_t prev_pf_addr = addr - (off << LOG2_BLOCK_SIZE);
+      if (rr_table.test(prev_pf_addr) and accuracy_table.lookup(rr_table.lookup(prev_pf_addr).pc, i) > ACCURACY_THRESHOLD) {
+        return; // Already covered by another learned offset
+      }
     }
   }
 
@@ -279,7 +286,7 @@ std::vector<uint64_t> CAERUS::calculateAccuratePrefetchAddrs(uint64_t addr, uint
   return pf_addrs;
 }
 
-std::vector<uint64_t> CAERUS::calculateAllPrefetchAddrs(uint64_t addr)
+std::vector<uint64_t> CAERUS::calculateAllPrefetchAddrs(uint64_t line_addr)
 {
   std::vector<uint64_t> pf_addrs;
 
@@ -287,7 +294,7 @@ std::vector<uint64_t> CAERUS::calculateAllPrefetchAddrs(uint64_t addr)
     if (offset == 0)
       continue;
 
-    uint64_t pf_addr = addr + (offset << LOG2_BLOCK_SIZE);
+    uint64_t pf_addr = (line_addr + offset) << LOG2_BLOCK_SIZE; // shift to get full addr bits
 
     // if ((addr >> LOG2_PAGE_SIZE) != (pf_addr >> LOG2_PAGE_SIZE)) {
     //   if constexpr (champsim::caerus_dbug) {
@@ -302,12 +309,12 @@ std::vector<uint64_t> CAERUS::calculateAllPrefetchAddrs(uint64_t addr)
   return pf_addrs;
 }
 
-void CAERUS::accuracy_train(uint64_t addr, uint64_t pc)
+void CAERUS::accuracy_train(uint64_t line_addr, uint64_t pc)
 {
   if (pc == 0)
     return;
 
-  std::vector<uint64_t> pf_addrs = calculateAllPrefetchAddrs(addr);
+  std::vector<uint64_t> pf_addrs = calculateAllPrefetchAddrs(line_addr);
 
   if constexpr (champsim::caerus_dbug) {
         std::cout << "ALL PF ADDR SIZE" << pf_addrs.size() << std::endl;
@@ -330,7 +337,7 @@ void CAERUS::accuracy_train(uint64_t addr, uint64_t pc)
     }
   }
 
-  eviction_table.insert(addr);
+  eviction_table.insert(line_addr);
 }
 
 void CAERUS::insertFill(uint64_t addr)
@@ -338,7 +345,7 @@ void CAERUS::insertFill(uint64_t addr)
   auto result = holding_table.lookup(addr);
   if (result.has_value()) {
     RRTable::Entry evicted_entry = rr_table.lookup(result->base_addr);
-    accuracy_train(evicted_entry.addr, evicted_entry.pc);
+    accuracy_train(evicted_entry.line_addr, evicted_entry.pc);
     rr_table.insert(result->base_addr, result->pc);
   }
 }
@@ -375,10 +382,14 @@ uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cac
     }
 
     if (pf_addrs.size() > 0) {
+      bool added_to_holding = false;
       for (auto pf_addr : pf_addrs) {
         bool issued = prefetch_line(pf_addr, true, metadata_in);
         if (issued) {
-          caerus->holding_table.insert(pf_addr, addr, ip); // Only if issued
+          if (!added_to_holding) {
+            caerus->holding_table.insert(pf_addr, addr, ip);
+            added_to_holding = true;
+          }
           ++(caerus->pf_issued_caerus);
         } else {
           if constexpr (champsim::caerus_dbug) {
@@ -389,7 +400,7 @@ uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cac
       }
     } else if (cache_hit && useful_prefetch) { // Prefetch hit where no prefetches issued
       RRTable::Entry evicted_entry = caerus->rr_table.lookup(addr);
-      caerus->accuracy_train(evicted_entry.addr, evicted_entry.pc);
+      caerus->accuracy_train(evicted_entry.line_addr, evicted_entry.pc);
       caerus->rr_table.insert(addr, ip);
     } else { // X is a cache miss with no PFs generated
       caerus->holding_table.insert(addr, addr, ip);

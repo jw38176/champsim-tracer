@@ -23,11 +23,11 @@ class RRTable
 {
 public:
   struct Entry {
-    uint64_t addr = 0;
+    uint64_t line_addr = 0;
     uint64_t pc = 0;
   };
 
-  RRTable(std::size_t size);
+  explicit RRTable(std::size_t size);
 
   void insert(uint64_t addr, uint64_t pc);
   Entry lookup(uint64_t addr) const;
@@ -94,12 +94,12 @@ public:
 
   void insert(uint64_t addr);
   bool test(uint64_t addr) const;
-  void clear();
 
 private:
+  std::size_t log_size;
   std::vector<uint64_t> table;
-  std::size_t table_size;
-  std::size_t next_index;
+
+  std::size_t index(uint64_t addr) const;
 };
 
 
