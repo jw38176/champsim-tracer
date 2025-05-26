@@ -26,7 +26,7 @@ struct tracker {
 
   constexpr static std::size_t TRACKER_SETS = 256;
   constexpr static std::size_t TRACKER_WAYS = 4;
-  constexpr static int PREFETCH_DEGREE = 3;
+  constexpr static int PREFETCH_DEGREE = 8;
 
   std::optional<lookahead_entry> active_lookahead;
 
