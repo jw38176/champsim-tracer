@@ -5,6 +5,9 @@ import argparse
 import sys 
 import os 
 import json 
+import datetime
+import glob
+import shutil
 from concurrent.futures import ThreadPoolExecutor
 
 from _SPEC2017_def import SPEC2017_SHORTCODE, SPEC2017_PATH
@@ -22,15 +25,25 @@ parser.add_argument('--name', type=str, help='Optional name for result directory
 parser.add_argument('--clean', action='store_true', help='Clean the build', required=False)
 parser.add_argument('--no_conf', action='store_true', help='Skip configuration (Still Make)', required=False) 
 parser.add_argument('--cppflags', type=str, help='Extra CPPFLAGS to pass to make (e.g. "-DKAIROS_DBUG -DTEST_DBUG")', required=False)
+parser.add_argument('--clean-old', action='store_true', help='Clean old build directories')
 
 args = parser.parse_args()
+
+def cleanup_old_builds(base_dir="bin", keep_last=5):
+    builds = sorted(glob.glob(os.path.join(base_dir, '*')), key=os.path.getmtime, reverse=True)
+    for old_build in builds[keep_last:]:
+        if os.path.basename(old_build) in ["champsim"]:
+            continue
+        print(f"Removing old build: {old_build}")
+        shutil.rmtree(old_build)
+
+if args.clean_old:
+    cleanup_old_builds("bin", keep_last=5)
 
 # See if input benchmark is valid
 if args.benchmark not in SPEC2017_SHORTCODE:
     print("Invalid benchmark: ", args.benchmark)
     sys.exit(1)
-
-prefetcher = "misc" # Default 
 
 config_path = args.config if args.config else "no_prefetch.json"
 with open(config_path) as config_file:
@@ -45,12 +58,16 @@ if args.config:
       prefetcher = args.name
 else: prefetcher = "no"
 
+# Create unique run name with timestamp if not provided
+timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+run_name = f"{prefetcher}_{timestamp}"
+build_dir = os.path.abspath(f"bin/{run_name}")
+
 if not args.no_conf:
-    # Update configuration
     print("======================") 
     print("Updating Configuration")
     print("======================")
-    result = subprocess.run(["./config.sh", config_path])
+    result = subprocess.run(["./config.sh", "--bindir", build_dir, config_path])
     if result.returncode != 0:
         print("Configuration failed")
         sys.exit(1)
@@ -60,7 +77,6 @@ print(f"Prefetchers Selected:  L1={prefetcher_selected_L1}  L2={prefetcher_selec
 print(f"Name: {prefetcher}")
 print("**********************")
 
-# Make
 print("=================")
 print("Building ChampSim")
 print("=================")
@@ -108,7 +124,7 @@ def champsim_kernel(kernel_arg):
     with open(f"results/{prefetcher}/{args.benchmark}/{benchmark_num}.{benchmark_name}.txt", "w+") as output_file:
         print(f"Dispatching {benchmark} ... [{job_number+1} / {total+1}]")
         result = subprocess.run([
-            "./bin/champsim", 
+            f"{build_dir}/champsim", 
             "--warmup-instructions", f"{WARMUP_INSTRUCTIONS}000000",
             "--simulation-instructions", f"{SIMULATION_INSTRUCTIONS}000000",
             SPEC2017_PATH + benchmark
