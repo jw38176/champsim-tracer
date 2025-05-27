@@ -4,7 +4,6 @@ import scienceplots
 from collections import defaultdict
 
 plt.style.use(["science", "light"])
-# plt.style.use(["science", "light", "no-latex"])
 
 # --- CONFIGURABLE ---
 LOG_DIR = 'results'
@@ -75,7 +74,7 @@ fig, ax = plt.subplots(figsize=(12, 6))
 
 for i, prefetcher in enumerate(plot_prefetchers):
     offsets = [xi + i * bar_width for xi in x]
-    ax.bar(offsets, speedup_data[prefetcher], width=bar_width, label=prefetcher)
+    ax.bar(offsets, speedup_data[prefetcher], width=bar_width, label=prefetcher, edgecolor='black', linewidth=0.5)
 
 ax.axhline(1.0, linestyle='--', color='black', linewidth=1, label='baseline')
 

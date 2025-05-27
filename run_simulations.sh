@@ -5,8 +5,8 @@ mkdir -p logs
 SCRIPT="simulate.py"
 
 # List your benchmarks and configs here
-BENCHMARKS=("bwaves603")
-CONFIGS=("" "berti.json" "multi_bop.json" "bop_stride.json" "caerus.json")
+BENCHMARKS=("soplex450" "omnetpp620" "leela641" "mcf605" "gcc602") 
+CONFIGS=("" "caerus.json")
 
 MAX_JOBS=1  # Number of parallel jobs allowed
 TOTAL_JOBS=$(( ${#BENCHMARKS[@]} * ${#CONFIGS[@]} ))
