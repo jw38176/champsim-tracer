@@ -42,12 +42,15 @@ void HoldingTable::insert(uint64_t addr, uint64_t base_addr, uint64_t pc)
   entries[idx] = {base_addr, pc};
 }
 
-std::optional<HoldingTable::Entry> HoldingTable::lookup(uint64_t addr) const
+std::optional<HoldingTable::Entry> HoldingTable::lookup(uint64_t addr)
 {
   auto idx = index(addr);
-  const Entry& e = entries[idx];
-  if (e.base_addr != 0) 
-    return e;
+  Entry& e = entries[idx];
+  if (e.base_addr != 0) {
+    Entry result = e;          
+    e = Entry{};       
+    return result;
+  }
   return std::nullopt;
 }
 

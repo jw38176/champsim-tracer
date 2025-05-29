@@ -53,7 +53,7 @@ public:
 
   void insert(uint64_t addr, uint64_t base_addr, uint64_t pc);
 
-  std::optional<Entry> lookup(uint64_t addr) const;
+  std::optional<Entry> lookup(uint64_t addr);
 
 private:
   std::vector<Entry> entries;
