@@ -275,12 +275,12 @@ std::vector<uint64_t> CAERUS::calculateAccuratePrefetchAddrs(uint64_t addr, uint
 
     uint64_t pf_addr = addr + (offset << LOG2_BLOCK_SIZE);
 
-    // if ((addr >> LOG2_PAGE_SIZE) != (pf_addr >> LOG2_PAGE_SIZE)) {
-    //   if constexpr (champsim::caerus_dbug) {
-    //     std::cout << "Prefetch not issued - Page crossed" << std::endl;
-    //   }
-    //   continue;
-    // }
+    if ((addr >> LOG2_PAGE_SIZE) != (pf_addr >> LOG2_PAGE_SIZE)) {
+      if constexpr (champsim::caerus_dbug) {
+        std::cout << "Prefetch not issued - Page crossed" << std::endl;
+      }
+      continue;
+    }
 
     pf_addrs.push_back(pf_addr);
 
@@ -302,12 +302,13 @@ std::vector<uint64_t> CAERUS::calculateAllPrefetchAddrs(uint64_t line_addr)
 
     uint64_t pf_addr = (line_addr + offset) << LOG2_BLOCK_SIZE; // shift to get full addr bits
 
-    // if ((addr >> LOG2_PAGE_SIZE) != (pf_addr >> LOG2_PAGE_SIZE)) {
-    //   if constexpr (champsim::caerus_dbug) {
-    //     std::cout << "Prefetch not issued - Page crossed" << std::endl;
-    //   }
-    //   continue;
-    // }
+    if (((line_addr << LOG2_BLOCK_SIZE) >> LOG2_PAGE_SIZE) != (pf_addr >> LOG2_PAGE_SIZE)) {
+      if constexpr (champsim::caerus_dbug) {
+        std::cout << "Generated prefetch would cross page" << std::endl;
+      }
+      pf_addrs.push_back(0); // represent page crosses by 0
+      continue;
+    }
 
     pf_addrs.push_back(pf_addr);
   }
@@ -329,6 +330,9 @@ void CAERUS::accuracy_train(uint64_t line_addr, uint64_t pc)
   for (int i = 0; i < NUM_OFFSETS; ++i) {
     if (i >= static_cast<int>(pf_addrs.size())){
       break; // for safety
+    }
+    if(pf_addrs[i] == 0) {
+      continue; // skip prefetches that cross page boundary
     }
     if (rr_table.test(pf_addrs[i]) || eviction_table.test(pf_addrs[i])) {
       accuracy_table.increment(pc, i);
@@ -355,13 +359,6 @@ void CAERUS::insertFill(uint64_t addr)
     rr_table.insert(result->base_addr, result->pc);
   }
 }
-
-// if ((base_address >> LOG2_PAGE_SIZE) != (addr >> LOG2_PAGE_SIZE)) {
-//   if constexpr (champsim::caerus_dbug) {
-//     std::cout << "Filled address crossed page" << std::endl;
-//   }
-//   return;
-// }
 
 void CACHE::prefetcher_initialize()
 {
