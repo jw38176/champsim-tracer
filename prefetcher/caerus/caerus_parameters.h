@@ -18,5 +18,7 @@ namespace caerus_space
   constexpr std::size_t HOLDING_TABLE_SIZE = 128;  // Size of the holding table
   constexpr std::size_t ACCURACY_TABLE_SIZE = 128; // Size of the pc accuracy table
   constexpr std::size_t EVICTION_TABLE_SIZE = 128; // Size of the RR victim table 
+
+  # define ALLOW_CROSS_PAGE_PREFETCH (true) // Determines if prefetches are allowed to cross page boundaries
 };
 # endif

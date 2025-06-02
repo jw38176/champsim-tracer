@@ -275,12 +275,15 @@ std::vector<uint64_t> CAERUS::calculateAccuratePrefetchAddrs(uint64_t addr, uint
 
     uint64_t pf_addr = addr + (offset << LOG2_BLOCK_SIZE);
 
-    if ((addr >> LOG2_PAGE_SIZE) != (pf_addr >> LOG2_PAGE_SIZE)) {
-      if constexpr (champsim::caerus_dbug) {
-        std::cout << "Prefetch not issued - Page crossed" << std::endl;
+    if(!ALLOW_CROSS_PAGE_PREFETCH){
+      if ((addr >> LOG2_PAGE_SIZE) != (pf_addr >> LOG2_PAGE_SIZE)) {
+        if constexpr (champsim::caerus_dbug) {
+          std::cout << "Prefetch not issued - Page crossed" << std::endl;
+        }
+        continue;
       }
-      continue;
     }
+    
     if (cache.contains_line(pf_addr)) {
       if constexpr (champsim::caerus_dbug) {
         std::cout << "Prefetch not issued - Already in cache" << std::endl;
@@ -309,12 +312,14 @@ std::vector<uint64_t> CAERUS::calculateAllPrefetchAddrs(uint64_t line_addr)
 
     uint64_t pf_addr = (line_addr + offset) << LOG2_BLOCK_SIZE; // shift to get full addr bits
 
-    if (((line_addr << LOG2_BLOCK_SIZE) >> LOG2_PAGE_SIZE) != (pf_addr >> LOG2_PAGE_SIZE)) {
-      if constexpr (champsim::caerus_dbug) {
-        std::cout << "Generated prefetch would cross page" << std::endl;
+    if(!ALLOW_CROSS_PAGE_PREFETCH){
+      if (((line_addr << LOG2_BLOCK_SIZE) >> LOG2_PAGE_SIZE) != (pf_addr >> LOG2_PAGE_SIZE)) {
+        if constexpr (champsim::caerus_dbug) {
+          std::cout << "Generated prefetch would cross page" << std::endl;
+        }
+        pf_addrs.push_back(0); // represent page crosses by 0
+        continue;
       }
-      pf_addrs.push_back(0); // represent page crosses by 0
-      continue;
     }
 
     pf_addrs.push_back(pf_addr);
@@ -338,9 +343,13 @@ void CAERUS::accuracy_train(uint64_t line_addr, uint64_t pc)
     if (i >= static_cast<int>(pf_addrs.size())){
       break; // for safety
     }
-    if(pf_addrs[i] == 0) {
-      continue; // skip prefetches that cross page boundary
+    
+    if(!ALLOW_CROSS_PAGE_PREFETCH){
+      if(pf_addrs[i] == 0) {
+        continue; // skip prefetches that cross page boundary
+      }
     }
+  
     if (rr_table.test(pf_addrs[i]) || eviction_table.test(pf_addrs[i])) {
       accuracy_table.increment(pc, i);
       if constexpr (champsim::caerus_dbug) {
