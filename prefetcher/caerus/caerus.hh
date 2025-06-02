@@ -77,13 +77,13 @@ public:
   void resetOffsetStats(int offset_idx);
 
 private:
-  std::vector<std::vector<int16_t>> table;
-
   std::size_t table_size;
+  
+  std::vector<std::vector<uint16_t>> table;
 
   int getIndex(uint64_t pc) const;
 
-  static constexpr int16_t ACC_MIN = -16;
+  static constexpr int16_t ACC_MIN = 0;
   static constexpr int16_t ACC_MAX = 15;
 };
 

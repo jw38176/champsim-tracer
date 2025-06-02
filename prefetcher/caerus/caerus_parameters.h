@@ -13,7 +13,7 @@ namespace caerus_space
   # define TAG_BITS             (12)  // Bits used to store the tag
   # define OFFSET_LIST_SIZE     (26)  // Number of entries in the offsets list
   # define NUM_OFFSETS          (4)   // The number of offsets that are learnt
-  # define ACCURACY_THRESHOLD   (0)   // Saturing counter value for pc/offset to be accurate
+  # define ACCURACY_THRESHOLD   (8)   // Saturing counter value for pc/offset to be accurate
 
   constexpr std::size_t HOLDING_TABLE_SIZE = 128;  // Size of the holding table
   constexpr std::size_t ACCURACY_TABLE_SIZE = 128; // Size of the pc accuracy table

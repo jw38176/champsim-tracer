@@ -61,7 +61,10 @@ uint64_t HoldingTable::index(uint64_t addr) const
   return hash;
 }
 
-AccuracyTable::AccuracyTable(std::size_t size) : table_size(size) { table.resize(table_size, std::vector<int16_t>(NUM_OFFSETS)); }
+AccuracyTable::AccuracyTable(std::size_t size)
+    : table_size(size),
+      table(size, std::vector<uint16_t>(NUM_OFFSETS, 8)) 
+{}
 
 int AccuracyTable::getIndex(uint64_t pc) const { return (pc ^ (pc / table_size)) % table_size; }
 
@@ -104,7 +107,7 @@ void AccuracyTable::resetOffsetStats(int offset_idx)
     return;
 
   for (std::size_t i = 0; i < table_size; ++i) {
-    table[i][offset_idx] = 0;
+    table[i][offset_idx] = 8;
   }
 }
 
@@ -202,7 +205,7 @@ void CAERUS::bestOffsetLearning(uint64_t addr, uint8_t cache_hit)
       if (off == 0) continue; // unused slot
 
       uint64_t prev_pf_addr = addr - (off << LOG2_BLOCK_SIZE);
-      if (rr_table.test(prev_pf_addr) and accuracy_table.lookup(rr_table.lookup(prev_pf_addr).pc, i) > ACCURACY_THRESHOLD) {
+      if (rr_table.test(prev_pf_addr) and accuracy_table.lookup(rr_table.lookup(prev_pf_addr).pc, i) >= ACCURACY_THRESHOLD) {
         return; // Already covered by another learned offset
       }
     }
