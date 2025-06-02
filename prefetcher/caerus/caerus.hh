@@ -155,7 +155,7 @@ public:
    */
   void bestOffsetLearning(uint64_t addr, uint8_t cache_hit);
 
-  std::vector<uint64_t> calculateAccuratePrefetchAddrs(uint64_t addr, uint64_t pc);
+  std::vector<uint64_t> calculateAccuratePrefetchAddrs(uint64_t addr, uint64_t pc, const CACHE& cache);
 
   std::vector<uint64_t> calculateAllPrefetchAddrs(uint64_t addr);
 

@@ -259,7 +259,7 @@ void CAERUS::bestOffsetLearning(uint64_t addr, uint8_t cache_hit)
   }
 }
 
-std::vector<uint64_t> CAERUS::calculateAccuratePrefetchAddrs(uint64_t addr, uint64_t pc)
+std::vector<uint64_t> CAERUS::calculateAccuratePrefetchAddrs(uint64_t addr, uint64_t pc, const CACHE& cache)
 {
   std::vector<uint64_t> pf_addrs;
 
@@ -279,6 +279,13 @@ std::vector<uint64_t> CAERUS::calculateAccuratePrefetchAddrs(uint64_t addr, uint
       if constexpr (champsim::caerus_dbug) {
         std::cout << "Prefetch not issued - Page crossed" << std::endl;
       }
+      continue;
+    }
+    if (cache.contains_line(pf_addr)) {
+      if constexpr (champsim::caerus_dbug) {
+        std::cout << "Prefetch not issued - Already in cache" << std::endl;
+      }
+      // Already in cache — skip
       continue;
     }
 
@@ -379,7 +386,7 @@ uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cac
       caerus->pf_useful_caerus++;
     }
 
-    auto pf_addrs = caerus->calculateAccuratePrefetchAddrs(addr, ip);
+    auto pf_addrs = caerus->calculateAccuratePrefetchAddrs(addr, ip, *this);
 
     if constexpr (champsim::caerus_dbug) {
         std::cout << "ACCURATE PF ADDR SIZE" << pf_addrs.size() << std::endl;
