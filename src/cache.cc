@@ -467,6 +467,17 @@ uint64_t CACHE::invalidate_entry(uint64_t inval_addr)
   return std::distance(begin, inv_way);
 }
 
+bool CACHE::contains_line(uint64_t address) const
+{
+  auto [set_begin, set_end] = get_set_span(address);
+  auto match_tag = address >> OFFSET_BITS;
+
+  return std::any_of(set_begin, set_end,
+                     [this, match_tag](const auto& entry) {
+                       return entry.valid && (entry.address >> OFFSET_BITS) == match_tag;
+                     });
+}
+
 int CACHE::prefetch_line(uint64_t pf_addr, bool fill_this_level, uint32_t prefetch_metadata)
 {
   ++sim_stats.pf_requested;
