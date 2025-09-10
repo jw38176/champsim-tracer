@@ -2,9 +2,9 @@
 #include <array>
 #include <map>
 #include <optional>
-
+#include <iostream>
 #include "cache.h"
-#include "msl/lru_table.h"
+#include "msl/lru_table.h"  
 
 namespace
 {
@@ -68,7 +68,7 @@ public:
       // If the next step would exceed the degree or run off the page, stop
       if (cache->virtual_prefetch || (pf_address >> LOG2_PAGE_SIZE) == (old_pf_address >> LOG2_PAGE_SIZE)) {
         // check the MSHR occupancy to decide if we're going to prefetch to this level or not
-        bool success = cache->prefetch_line(pf_address, (cache->get_mshr_occupancy_ratio() < 0.5), 0);
+        bool success = cache->prefetch_line(pf_address, (cache->get_mshr_occupancy_ratio() < 0.5), 0x2); // 0x2 is the metadata for stride prefetch
         if (success)
           active_lookahead = {pf_address, stride, degree - 1};
         // If we fail, try again next cycle

@@ -185,7 +185,7 @@ std::optional<uint64_t> BOP::calculatePrefetchAddr(uint64_t addr)
 
 void BOP::insertFill(uint64_t addr, uint8_t prefetch, uint32_t metadata_in)
 {
-  if (issuePrefetchRequests && prefetch && metadata_in == 2) {
+  if (issuePrefetchRequests && prefetch && metadata_in == 0x1) {
     uint64_t base_address = addr - (bestOffset << LOG2_BLOCK_SIZE);
 
     if ((base_address >> LOG2_PAGE_SIZE) != (addr >> LOG2_PAGE_SIZE))
@@ -234,7 +234,7 @@ uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cac
     if (bop->issuePrefetchRequests) {
       auto pf_addr = bop->calculatePrefetchAddr(addr);
       if (pf_addr.has_value()) {
-        prefetch_line(*pf_addr, true, 2);
+        prefetch_line(*pf_addr, true, 0x1);
       }
     }
   }

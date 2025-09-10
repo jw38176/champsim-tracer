@@ -32,6 +32,8 @@
 #include "util/span.h"
 #include <fmt/core.h>
 
+#include <iostream>
+
 CACHE::tag_lookup_type::tag_lookup_type(request_type req, bool local_pref, bool skip)
     : address(req.address), v_address(req.v_address), data(req.data), ip(req.ip), instr_id(req.instr_id), pf_metadata(req.pf_metadata), cpu(req.cpu),
       type(req.type), prefetch_from_this(local_pref), skip_fill(skip), is_translated(req.is_translated), instr_depend_on_me(req.instr_depend_on_me)
@@ -127,7 +129,7 @@ bool CACHE::handle_fill(const mshr_type& fill_mshr)
     if (success) {
       auto evicting_address = (ever_seen_data ? way->address : way->v_address) & ~champsim::bitmask(match_offset_bits ? 0 : OFFSET_BITS);
 
-      if (way->prefetch)
+      if (way->prefetch && way->pf_metadata == 0x1) // Only records Berti
         ++sim_stats.pf_useless;
 
       if (fill_mshr.type == access_type::PREFETCH)
@@ -203,7 +205,7 @@ bool CACHE::try_hit(const tag_lookup_type& handle_pkt)
     way->dirty |= (handle_pkt.type == access_type::WRITE);
 
     // update prefetch stats and reset prefetch bit
-    if (useful_prefetch) {
+    if (useful_prefetch && way->pf_metadata == 0x1) { // Exludes Stride
       ++sim_stats.pf_useful;
       way->prefetch = false;
     }

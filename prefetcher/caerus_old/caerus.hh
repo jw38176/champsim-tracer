@@ -11,9 +11,9 @@
 #include <vector>
 
 #include "cache.h"
+#include "caerus_parameters.h"
 #include "msl/bits.h"
 #include "msl/lru_table.h"
-#include "caerus_parameters.h"
 #include <unordered_set>
 
 namespace caerus_space
@@ -62,31 +62,6 @@ private:
   uint64_t index(uint64_t addr) const;
 };
 
-class RecentPrefetchesTable
-{
-public:
-  struct Entry {
-    uint64_t pf_addr = 0;
-    uint64_t offset = 0;
-    int offset_idx = 0;
-  };
-
-  explicit RecentPrefetchesTable(std::size_t size);
-
-  void insert(uint64_t pf_addr, uint64_t offset, int offset_idx);
-
-  Entry lookup(uint64_t pf_addr);
-
-  bool test(uint64_t pf_addr) const;
-
-private:
-  std::vector<Entry> entries;
-  uint64_t log_size;
-
-  uint64_t index(uint64_t pf_addr) const;
-};
-
-
 
 class AccuracyTable
 {
@@ -109,7 +84,7 @@ private:
   int getIndex(uint64_t pc) const;
 
   static constexpr int16_t ACC_MIN = 0;
-  static constexpr int16_t ACC_MAX = 15; // 4 bit sat counter
+  static constexpr int16_t ACC_MAX = 15;
 };
 
 
@@ -126,6 +101,7 @@ private:
 
   std::size_t index(uint64_t addr) const;
 };
+
 
 class CAERUS
 {
@@ -150,21 +126,19 @@ private:
   /** Current round */
   unsigned int round;
 
+  /** Generate a hash for the specified address to index the RR table
+   *  @param addr: address to hash
+   */
+  unsigned int index(uint64_t addr) const;
+
   /** Reset all the scores from the offset list */
   void resetScores();
-
 public:
+  /** Total number of pf issued */
+  unsigned int pf_issued_caerus = 0;
 
-  // STATS counters 
-  uint64_t round_max_counter = 0;
-  uint64_t score_max_counter = 0;
-  uint64_t bad_score_counter = 0;
-  uint64_t trigger_pf_counter = 0;
-  uint64_t pf_counter = 0;  
-  uint64_t rp_miss_counter = 0;
-  uint64_t rp_hit_counter = 0;
-
-  uint64_t overlap_leakage_counter = 0; 
+  /** Total number of useful pf */
+  unsigned int pf_useful_caerus = 0;
 
   RRTable rr_table;
 
@@ -174,9 +148,6 @@ public:
 
   EvictionTable eviction_table;
 
-  RecentPrefetchesTable recent_prefetches_table;
-
-
   /** Learning phase of CAERUS. Update the intermediate values of the
    * round and update the best offset if found
    * @param addr: full address used to compute X-O tag to determine
@@ -184,22 +155,19 @@ public:
    */
   void bestOffsetLearning(uint64_t addr, uint8_t cache_hit);
 
-  std::vector<uint64_t> calculateAccuratePrefetchAddrs(uint64_t addr, uint64_t pc, CACHE* cache);
-
-  std::vector<uint64_t> calculateAccuratePrefetchOffsets(uint64_t addr, uint64_t pc, CACHE* cache);
+  std::vector<uint64_t> calculateAccuratePrefetchAddrs(uint64_t addr, uint64_t pc, const CACHE& cache);
 
   std::vector<uint64_t> calculateAllPrefetchAddrs(uint64_t addr);
 
-  int getOffsetIdx(uint64_t offset);
-
-  void insertFill(uint64_t addr, uint64_t current_cycle);
+  void insertFill(uint64_t addr);
 
   void accuracy_train(uint64_t addr, uint64_t pc);
-
 
   CAERUS();
   ~CAERUS() = default;
 }; // class CAERUS
+
+CAERUS* caerus;
 
 } // namespace caerus_space
 
