@@ -76,10 +76,14 @@ public:
 
   void resetOffsetStats(int offset_idx);
 
+  int next_training_offset_idx() const; 
+
 private:
   std::size_t table_size;
   
   std::vector<std::vector<uint16_t>> table;
+
+  std::vector<std::size_t> activation_table; 
 
   int getIndex(uint64_t pc) const;
 
@@ -109,6 +113,7 @@ private:
   /** Learning phase parameters */
   const unsigned int scoreMax;
   const unsigned int roundMax;
+  const unsigned int badScore;
 
   /** Structure to save the offset and the score */
   typedef std::pair<int16_t, uint8_t> OffsetListEntry;
@@ -158,6 +163,8 @@ public:
   std::vector<uint64_t> calculateAccuratePrefetchAddrs(uint64_t addr, uint64_t pc, const CACHE& cache);
 
   std::vector<uint64_t> calculateAllPrefetchAddrs(uint64_t addr);
+
+  unsigned int next_training_offset_idx();
 
   void insertFill(uint64_t addr);
 

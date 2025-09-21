@@ -63,7 +63,7 @@ uint64_t HoldingTable::index(uint64_t addr) const
 
 AccuracyTable::AccuracyTable(std::size_t size)
     : table_size(size),
-      table(size, std::vector<uint16_t>(NUM_OFFSETS, 8)) 
+      table(size, std::vector<uint16_t>(NUM_OFFSETS, 8))
 {}
 
 int AccuracyTable::getIndex(uint64_t pc) const { return (pc ^ (pc / table_size)) % table_size; }
@@ -81,8 +81,10 @@ void AccuracyTable::increment(uint64_t pc, int offset_idx)
 {
   int idx = getIndex(pc);
   if (offset_idx >= 0 && offset_idx < NUM_OFFSETS) {
+
     if (table[idx][offset_idx] < ACC_MAX)
       table[idx][offset_idx]++;
+
     if constexpr (champsim::caerus_dbug) {
       std::cout << "Offset score incremented to: " << table[idx][offset_idx] << std::endl;
     }
@@ -93,8 +95,10 @@ void AccuracyTable::decrement(uint64_t pc, int offset_idx)
 {
   int idx = getIndex(pc);
   if (offset_idx >= 0 && offset_idx < NUM_OFFSETS) {
+
     if (table[idx][offset_idx] > ACC_MIN)
       table[idx][offset_idx]--;
+
     if constexpr (champsim::caerus_dbug) {
       std::cout << "Offset score decremented to: " << table[idx][offset_idx] << std::endl;
     }
@@ -138,7 +142,7 @@ bool EvictionTable::test(uint64_t addr) const
 }
 
 CAERUS::CAERUS()
-    : scoreMax(SCORE_MAX), roundMax(ROUND_MAX), phaseBestOffset(0), bestScore(0), round(0), rr_table(RR_SIZE), holding_table(HOLDING_TABLE_SIZE),
+    : scoreMax(SCORE_MAX), roundMax(ROUND_MAX), badScore(BAD_SCORE), phaseBestOffset(0), bestScore(0), round(0), rr_table(RR_SIZE), holding_table(HOLDING_TABLE_SIZE),
       accuracy_table(ACCURACY_TABLE_SIZE), eviction_table(EVICTION_TABLE_SIZE)
 
 {
@@ -173,7 +177,13 @@ CAERUS::CAERUS()
     if (offset == 1) {
       offsetsList.push_back(OffsetListEntry(offset_i, 0));
       i++;
-    }
+      
+      // Add negative offset if enabled
+      if (NEGATIVE_OFFSETS_ENABLE) {
+        offsetsList.push_back(OffsetListEntry(-offset_i, 0));
+        i++;
+      }
+    } 
 
     offset_i++;
   }
@@ -194,9 +204,35 @@ void CAERUS::resetScores()
   }
 }
 
+unsigned int CAERUS::next_training_offset_idx()
+{
+  // Move to next offset slot from the current one that is not 0 (wrap around)
+  current_learning_offset_idx = (current_learning_offset_idx + 1) % learned_offsets.size();
+  int wrap_count = 0;
+
+  while (learned_offsets[current_learning_offset_idx] == 0) {
+
+    current_learning_offset_idx = (current_learning_offset_idx + 1) % learned_offsets.size();
+    wrap_count++;
+
+    if (wrap_count > learned_offsets.size()) {
+      // All offsets are 0, return 0
+      current_learning_offset_idx = 0;
+      break;
+    }
+
+  }
+
+  return current_learning_offset_idx;
+}
+
+
 void CAERUS::bestOffsetLearning(uint64_t addr, uint8_t cache_hit)
 {
-  if (cache_hit) {
+
+  uint64_t offset = (*offsetsListIterator).first;
+
+  // if (cache_hit) {
     // Skip learning if any of the already-learned offsets covered this addr
     for (std::size_t i = 0; i < learned_offsets.size(); ++i) {
       if (i == current_learning_offset_idx) continue; // skip the offset we're learning
@@ -208,10 +244,17 @@ void CAERUS::bestOffsetLearning(uint64_t addr, uint8_t cache_hit)
       if (rr_table.test(prev_pf_addr) and accuracy_table.lookup(rr_table.lookup(prev_pf_addr).pc, i) >= ACCURACY_THRESHOLD) {
         return; // Already covered by another learned offset
       }
-    }
-  }
 
-  uint64_t offset = (*offsetsListIterator).first;
+      if (off == offset) {
+      ++offsetsListIterator;
+      if (offsetsListIterator == offsetsList.end()) {
+          offsetsListIterator = offsetsList.begin();
+          round++;
+        }
+      }
+
+    }
+  // }
 
   uint64_t test_addr = addr - (offset << LOG2_BLOCK_SIZE);
 
@@ -240,16 +283,30 @@ void CAERUS::bestOffsetLearning(uint64_t addr, uint8_t cache_hit)
 
   // Learning phase end
   if ((bestScore >= scoreMax) || (round >= roundMax)) {
-    learned_offsets[current_learning_offset_idx] = phaseBestOffset;
-    if constexpr (champsim::caerus_dbug) {
-      std::cout << "Learned new offset #" << current_learning_offset_idx << ": " << phaseBestOffset << std::endl;
+
+    if (bestScore >= badScore) {
+
+      learned_offsets[current_learning_offset_idx] = phaseBestOffset;
+
+      // Reset statistics for this offset
+      accuracy_table.resetOffsetStats(current_learning_offset_idx);
+
+      // Move to next learning slot 
+      current_learning_offset_idx = (current_learning_offset_idx + 1) % learned_offsets.size();
+      // current_learning_offset_idx = accuracy_table.next_training_offset_idx();
+
+      if constexpr (champsim::caerus_dbug) {
+        std::cout << "Learned new offset #" << current_learning_offset_idx << ": " << phaseBestOffset << std::endl;
+      }
+
+    } else {
+
+      // No offset learned
+      learned_offsets[current_learning_offset_idx] = 0; // Deactivate offset slot 
+      accuracy_table.resetOffsetStats(current_learning_offset_idx);
+      current_learning_offset_idx = next_training_offset_idx();
+
     }
-
-    // Reset statistics for this offset
-    accuracy_table.resetOffsetStats(current_learning_offset_idx);
-
-    // Move to next learning slot (wrap 0–3)
-    current_learning_offset_idx = (current_learning_offset_idx + 1) % learned_offsets.size();
 
     // Reset learning phase
     round = 0;
